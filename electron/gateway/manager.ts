@@ -51,6 +51,7 @@ import {
 } from './reload-policy';
 import { classifyGatewayStderrMessage, recordGatewayStartupStderrLine } from './startup-stderr';
 import { runGatewayStartupSequence } from './startup-orchestrator';
+import { findOnboardingGateway, isLocalOnboarding } from '../utils/local-onboarding';
 
 export interface GatewayStatus {
   state: GatewayLifecycleState;
@@ -235,12 +236,11 @@ export class GatewayManager extends EventEmitter {
 
     // Check if Python environment is ready (self-healing) asynchronously.
     // Fire-and-forget: only needs to run once, not on every retry.
-    warmupManagedPythonReadiness();
+    if (!isLocalOnboarding()) warmupManagedPythonReadiness();
 
     try {
       await runGatewayStartupSequence({
         port: this.status.port,
-        ownedPid: this.process?.pid,
         shouldWaitForPortFree: process.platform === 'win32',
         resetStartupStderrLines: () => {
           this.recentStartupStderrLines = [];
@@ -250,6 +250,9 @@ export class GatewayManager extends EventEmitter {
           this.lifecycleController.assert(startEpoch, phase);
         },
         findExistingGateway: async (port) => {
+          if (isLocalOnboarding()) {
+            return findOnboardingGateway(port, this.ownsProcess, this.process?.pid, waitForPortFree);
+          }
           // Always read the current process pid dynamically so that retries
           // don't treat a just-spawned gateway as an orphan.  The ownedPid
           // snapshot captured at start() entry is stale after startProcess()
@@ -289,7 +292,7 @@ export class GatewayManager extends EventEmitter {
           this.startHealthCheck();
           logger.debug('Gateway started successfully');
         },
-        runDoctorRepair: async () => await runOpenClawDoctorRepair(),
+        runDoctorRepair: async () => isLocalOnboarding() ? false : await runOpenClawDoctorRepair(),
         onDoctorRepairSuccess: () => {
           this.setStatus({ state: 'starting', error: undefined, reconnectAttempts: 0 });
         },
@@ -340,7 +343,7 @@ export class GatewayManager extends EventEmitter {
 
     // If this manager is attached to an external gateway process, ask it to shut down
     // over protocol before closing the socket.
-    if (!this.ownsProcess && this.ws?.readyState === WebSocket.OPEN && this.externalShutdownSupported !== false) {
+    if (!isLocalOnboarding() && !this.ownsProcess && this.ws?.readyState === WebSocket.OPEN && this.externalShutdownSupported !== false) {
       try {
         await this.rpc('shutdown', undefined, 5000);
         this.externalShutdownSupported = true;
@@ -727,7 +730,7 @@ export class GatewayManager extends EventEmitter {
    */
   private async startProcess(): Promise<void> {
     const launchContext = await prepareGatewayLaunchContext(this.status.port);
-    await unloadLaunchctlGatewayService();
+    if (!isLocalOnboarding()) await unloadLaunchctlGatewayService();
     this.processExitCode = null;
 
     // Per-process dedup map for stderr lines — resets on each new spawn.

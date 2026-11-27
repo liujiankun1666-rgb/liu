@@ -43,13 +43,16 @@ import { deviceOAuthManager } from '../utils/device-oauth';
 import { browserOAuthManager } from '../utils/browser-oauth';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
 import { syncAllProviderAuthToRuntime } from '../services/providers/provider-runtime-sync';
+import { isLocalOnboarding, localOnboardingUserData } from '../utils/local-onboarding';
 
 const WINDOWS_APP_USER_MODEL_ID = 'app.clawx.desktop';
 const isE2EMode = process.env.CLAWX_E2E === '1';
 const requestedUserDataDir = process.env.CLAWX_USER_DATA_DIR?.trim();
+const onboardingUserDataDir = localOnboardingUserData();
+const allowAutomaticStartupSideEffects = !isE2EMode && !isLocalOnboarding();
 
-if (isE2EMode && requestedUserDataDir) {
-  app.setPath('userData', requestedUserDataDir);
+if (onboardingUserDataDir || (isE2EMode && requestedUserDataDir)) {
+  app.setPath('userData', onboardingUserDataDir || requestedUserDataDir!);
 }
 
 // Disable GPU hardware acceleration globally for maximum stability across
@@ -278,11 +281,12 @@ async function initialize(): Promise<void> {
   // Initialize logger first
   logger.init();
   logger.info('=== ClawX Application Starting ===');
+  logger.info(`Startup mode: e2e=${isE2EMode}, localOnboarding=${isLocalOnboarding()}`);
   logger.debug(
     `Runtime: platform=${process.platform}/${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}, packaged=${app.isPackaged}, pid=${process.pid}, ppid=${process.ppid}`
   );
 
-  if (!isE2EMode) {
+  if (allowAutomaticStartupSideEffects) {
     // Warm up network optimization (non-blocking)
     void warmupNetworkOptimization();
 
@@ -292,8 +296,11 @@ async function initialize(): Promise<void> {
     // Apply persisted proxy settings before creating windows or network requests.
     await applyProxySettings();
     await syncLaunchAtStartupSettingFromStore();
-  } else {
+  } else if (isE2EMode) {
     logger.info('Running in E2E mode: startup side effects minimized');
+  } else {
+    await applyProxySettings();
+    logger.info('Local onboarding: real host/Gateway transports; automatic integrations disabled');
   }
 
   // Set application menu
@@ -349,7 +356,7 @@ async function initialize(): Promise<void> {
   // Repair any bootstrap files that only contain ClawX markers (no OpenClaw
   // template content). This fixes a race condition where ensureClawXContext()
   // previously created the file before the gateway could seed the full template.
-  if (!isE2EMode) {
+  if (allowAutomaticStartupSideEffects) {
     void repairClawXOnlyBootstrapFiles().catch((error) => {
       logger.warn('Failed to repair bootstrap files:', error);
     });
@@ -357,7 +364,7 @@ async function initialize(): Promise<void> {
 
   // Pre-deploy built-in skills (feishu-doc, feishu-drive, feishu-perm, feishu-wiki)
   // to ~/.openclaw/skills/ so they are immediately available without manual install.
-  if (!isE2EMode) {
+  if (allowAutomaticStartupSideEffects) {
     void ensureBuiltinSkillsInstalled().catch((error) => {
       logger.warn('Failed to install built-in skills:', error);
     });
@@ -366,7 +373,7 @@ async function initialize(): Promise<void> {
   // Pre-deploy bundled third-party skills from resources/preinstalled-skills.
   // This installs full skill directories (not only SKILL.md) in an idempotent,
   // non-destructive way and never blocks startup.
-  if (!isE2EMode) {
+  if (allowAutomaticStartupSideEffects) {
     void ensurePreinstalledSkillsInstalled().catch((error) => {
       logger.warn('Failed to install preinstalled skills:', error);
     });
@@ -375,7 +382,7 @@ async function initialize(): Promise<void> {
   // Pre-deploy/upgrade bundled OpenClaw plugins (dingtalk, wecom, feishu, wechat)
   // to ~/.openclaw/extensions/ so they are always up-to-date after an app update.
   // Note: qqbot was moved to a built-in channel in OpenClaw 3.31.
-  if (!isE2EMode) {
+  if (allowAutomaticStartupSideEffects) {
     void ensureAllBundledPluginsInstalled().catch((error) => {
       logger.warn('Failed to install/upgrade bundled plugins:', error);
     });
@@ -385,7 +392,7 @@ async function initialize(): Promise<void> {
   // renderer subscribers observe the full startup lifecycle.
   gatewayManager.on('status', (status: { state: string }) => {
     hostEventBus.emit('gateway:status', status);
-    if (status.state === 'running' && !isE2EMode) {
+    if (status.state === 'running' && allowAutomaticStartupSideEffects) {
       void ensureClawXContext().catch((error) => {
         logger.warn('Failed to re-merge ClawX context after gateway reconnect:', error);
       });
@@ -458,7 +465,7 @@ async function initialize(): Promise<void> {
 
   // Start Gateway automatically (this seeds missing bootstrap files with full templates)
   const gatewayAutoStart = await getSetting('gatewayAutoStart');
-  if (!isE2EMode && gatewayAutoStart) {
+  if (allowAutomaticStartupSideEffects && gatewayAutoStart) {
     try {
       await syncAllProviderAuthToRuntime();
       logger.debug('Auto-starting Gateway...');
@@ -477,14 +484,14 @@ async function initialize(): Promise<void> {
   // Merge ClawX context snippets into the workspace bootstrap files.
   // The gateway seeds workspace files asynchronously after its HTTP server
   // is ready, so ensureClawXContext will retry until the target files appear.
-  if (!isE2EMode) {
+  if (allowAutomaticStartupSideEffects) {
     void ensureClawXContext().catch((error) => {
       logger.warn('Failed to merge ClawX context into workspace:', error);
     });
   }
 
   // Auto-install openclaw CLI and shell completions (non-blocking).
-  if (!isE2EMode) {
+  if (allowAutomaticStartupSideEffects) {
     void autoInstallCliIfNeeded((installedPath) => {
       mainWindow?.webContents.send('openclaw:cli-installed', installedPath);
     }).then(() => {

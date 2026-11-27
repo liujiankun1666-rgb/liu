@@ -113,6 +113,12 @@ ClawX 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 
 详见[完整功能矩阵](docs/hotel-operations/README.md)、[岗位指令](docs/hotel-operations/roles.md)、[任务与回传协议](docs/hotel-operations/protocol.md)和[现场接入清单](docs/hotel-operations/integration.md)。
 
+本机受控联调使用显式独立 userData，关闭自动启动修复与更新；这是真实 Electron 模式而非 E2E。固定 OpenClaw 仍可能同步本机 CLI 认证，派单前须核来源。详见[启动边界与本地报表交接](docs/hotel-operations/local-onboarding.md)。
+
+新增独立原生 Codex CLI 技术适配器，可在不启动 Gateway 时执行受限技术 code 任务；逐次核验工作区/网络边界，结果先待独立验收。详见[原生技术执行端](docs/hotel-operations/native-codex.md)。本机子链不等于云端 ChatGPT 已接通。
+
+现场脱敏验证与未接通部分见 [TASK-011 验证摘要](docs/hotel-operations/task-011-verification.md)；正式私有连接准备见 [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md)。
+
 ### 📡 多频道管理
 同时配置和监控多个 AI 频道。每个频道独立运行，允许你为不同任务运行专门的智能体。
 现在每个频道支持多个账号，并可在 Channels 页面直接完成账号绑定到 Agent 与默认账号切换。

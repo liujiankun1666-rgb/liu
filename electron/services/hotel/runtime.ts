@@ -3,10 +3,11 @@ import type { HostApiContext } from '../../api/context';
 import { listAgentsSnapshot } from '../../utils/agent-config';
 import { logger } from '../../utils/logger';
 import type { HotelTask, HotelTaskResult, HotelSnapshotResponse, HotelCapability } from '../../../shared/hotel';
-import { HOTEL_TASK_TEMPLATES, type HotelService } from './domain';
+import { HotelDomainError, HOTEL_TASK_TEMPLATES, type HotelService } from './domain';
 import { getHotelService } from './store';
 import { asRecord, assistantText, buildHotelBrief, parseHotelResult } from './gateway-payload';
 import { inspectHotelExecutionPolicy } from './execution-policy';
+import { CODEX_TECHNICAL_ID, CodexCliExecutor, type CodexTechnicalExecutor } from './codex-cli';
 
 type Gateway = Pick<GatewayManager, 'rpc' | 'getStatus' | 'on' | 'off'>;
 export interface HotelRuntimeOptions {
@@ -14,6 +15,7 @@ export interface HotelRuntimeOptions {
   policy?: typeof inspectHotelExecutionPolicy;
   onChange?: () => void;
   autoStart?: boolean;
+  codex?: CodexTechnicalExecutor;
 }
 
 const SAFE_ACTIONS = new Set(['read', 'analysis', 'code']);
@@ -30,8 +32,10 @@ export class HotelRuntime {
   private readonly policy;
   private readonly onChange;
   private readonly ready: Promise<void>;
+  private readonly codex?: CodexTechnicalExecutor;
 
   constructor(readonly service: HotelService, readonly gateway: Gateway, options: HotelRuntimeOptions = {}) {
+    this.codex = options.codex;
     this.agents = options.agents ?? listAgentsSnapshot;
     this.policy = options.policy ?? inspectHotelExecutionPolicy;
     this.onChange = options.onChange ?? (() => {});
@@ -52,18 +56,30 @@ export class HotelRuntime {
     let discoveryDetail = '从本机 OpenClaw 配置读取 Agent；绑定不会创建或覆盖 Agent。';
     try { agents = (await this.agents()).agents; }
     catch { discoveryDetail = '读取本机 Agent 配置失败，请检查本机 OpenClaw 配置；没有假定已有 Agent 可用。'; }
+    const configuredNative = await this.codex?.describe();
+    const collision = agents.some((agent) => agent.id === CODEX_TECHNICAL_ID);
+    const native = collision ? null : configuredNative;
+    if (native) { agents.push(native); discoveryDetail += ' 另列独立原生Codex技术执行端，不属于OpenClaw Agent。'; }
+    if (collision) discoveryDetail += ' 保留ID与OpenClaw Agent冲突，原生技术派单已阻塞。';
     const capabilities: HotelCapability[] = [
       { id: 'task-center', label: '任务、验收与审批', status: 'implemented', detail: '持久任务、父子依赖、回传、版本审批、审计与重启恢复。' },
       { id: 'agent-discovery', label: '现有 Agent 复用', status: agents.length ? 'implemented' : 'needs_connection', detail: discoveryDetail },
       { id: 'gateway', label: '本机 Agent 调度', status: this.gateway.getStatus().state === 'running' ? 'implemented' : 'needs_connection', detail: '通过 Gateway 派发独立任务会话；还需绑定岗位并通过执行权限检查。' },
       { id: 'chatgpt', label: 'ChatGPT 对话桥接', status: 'needs_connection', detail: '提供受限 MCP 接口和本机 stdio 客户端；当前聊天未自动获得本机连接，远程 HTTPS 接入须另行联调。' },
-      { id: 'codex', label: 'Codex 技术工单', status: 'implemented', detail: '技术工单、依赖、结构化回传已提供；本机 Codex 客户端或具备隔离权限的技术 Agent 仍需绑定。' },
+      { id: 'codex', label: 'Codex 技术工单', status: native ? 'implemented' : 'needs_connection', detail: native ? '独立原生Codex技术端已配置；每次派单前实测权限，结果先待验收。模型可用性以真实回执为准。' : '技术工单已提供，独立Codex技术执行端尚未配置；不把模型配置当执行器。' },
       { id: 'pms', label: '别样红业务数据', status: 'needs_connection', detail: '需要在运行 ClawX 的电脑上验证账号、读取范围与来源；历史登录反馈不当作当前可用证据。' },
       { id: 'ctrip', label: '携程业务数据', status: 'needs_connection', detail: '复用运营 Agent；曝光、转化、订单、评价须有实际访问与来源证据。' },
       { id: 'douyin', label: '抖音创作与审核', status: 'implemented', detail: '提供完整创作任务与分项评分验证，低于80分不能记录已发布；不自动发布。' },
       { id: 'writes', label: '调价、支付、退款、对客发送', status: 'unavailable', detail: '可提交具体方案并审批；尚未接入受控执行适配器，批准后仍不会自动写入生产后台。' },
     ];
     return { success: true, snapshot: await this.service.snapshot(), agents, gateway: this.gateway.getStatus(), capabilities, templates: HOTEL_TASK_TEMPLATES };
+  }
+
+  async inspectExecutionPolicy(agentId: string, action: 'read' | 'analysis' | 'code', propertyId?: string) {
+    if (agentId !== CODEX_TECHNICAL_ID) return { backend: 'gateway', ...await this.policy(agentId, action) };
+    if (action !== 'code' || !propertyId || !(await this.service.snapshot()).properties.some((property) => property.id === propertyId)) throw new HotelDomainError('原生Codex预检要求有效propertyId及action=code');
+    if (!this.codex || (await this.agents()).agents.some((agent) => agent.id === CODEX_TECHNICAL_ID)) return { backend: 'codex-cli', allowed: false, reason: '原生技术执行端未配置或ID与OpenClaw冲突', verifiedTools: [] };
+    return { backend: 'codex-cli', ...await this.codex.inspect(propertyId) };
   }
 
   /** Serializes reservations, not model work, so the concurrency bound is real. */
@@ -85,10 +101,6 @@ export class HotelRuntime {
       return this.service.claimTask(taskId, { availableAgentIds: [] });
     }
     if (task.status !== 'queued') throw new Error('请先将任务加入执行队列');
-    if (this.gateway.getStatus().state !== 'running') {
-      await this.service.markWaiting(taskId, 'Gateway 尚未连接，任务已保留，未发送');
-      throw new Error('Gateway 尚未连接，任务已保留，未发送');
-    }
     if (snapshot.tasks.filter((item) => item.status === 'running').length >= MAX_CONCURRENT) {
       await this.service.markWaiting(taskId, '已有2项任务执行中，等待可用执行位置');
       throw new Error('已有2项任务执行中，本任务继续等待队列');
@@ -97,6 +109,33 @@ export class HotelRuntime {
     if (!binding?.agentId || !binding.enabled) {
       await this.service.markWaiting(taskId, '请先绑定并启用此门店的现有 Agent 岗位', true);
       throw new Error('请先绑定并启用此门店的现有 Agent 岗位');
+    }
+    if (binding.agentId === CODEX_TECHNICAL_ID) {
+      if (task.role !== 'codex' || task.action !== 'code' || !this.codex || task.reviewTarget) {
+        await this.service.markWaiting(taskId, '原生Codex仅接受独立技术code任务，不执行经营岗位或验收任务', true);
+        throw new Error('原生Codex仅接受独立技术code任务');
+      }
+      const policy = await this.inspectExecutionPolicy(CODEX_TECHNICAL_ID, 'code', task.propertyId);
+      if (!policy.allowed) {
+        await this.service.markWaiting(taskId, `原生执行权限待核验：${policy.reason}`, true);
+        throw new Error(policy.reason);
+      }
+      const claimed = await this.service.claimTask(taskId, { availableAgentIds: [CODEX_TECHNICAL_ID], expectedAgentId: CODEX_TECHNICAL_ID, expectedPlanVersion: task.planVersion, executor: 'codex-cli' });
+      const attempt = claimed.attempts.at(-1)!;
+      this.onChange();
+      void this.codex.execute(claimed, buildHotelBrief(claimed, await this.service.snapshot())).then(async (receipt) => {
+        const current = (await this.service.snapshot()).tasks.find((item) => item.id === taskId)!;
+        if ((current.status === 'running' || current.status === 'blocked') && current.attempts.at(-1)?.id === attempt.id) await this.consumeResult(current, receipt.text, receipt.runId, 'codex-cli');
+      }).catch(async (error) => {
+        const current = (await this.service.snapshot()).tasks.find((item) => item.id === taskId);
+        if (current?.status === 'running' && current.attempts.at(-1)?.id === attempt.id) await this.service.failTask(taskId, attempt.id, error instanceof Error ? error.message : 'Native Codex execution failed', true);
+        this.onChange();
+      }).catch(this.logError);
+      return claimed;
+    }
+    if (this.gateway.getStatus().state !== 'running') {
+      await this.service.markWaiting(taskId, 'Gateway 尚未连接，任务已保留，未发送');
+      throw new Error('Gateway 尚未连接，任务已保留，未发送');
     }
     const policy = await this.policy(binding.agentId, task.action as 'read' | 'analysis' | 'code');
     if (!policy.allowed) {
@@ -170,7 +209,7 @@ export class HotelRuntime {
     const snapshot = await this.service.snapshot();
     const task = snapshot.tasks.find((item) => {
       const attempt = item.attempts.at(-1);
-      if (!attempt) return false;
+      if (!attempt || attempt.executor === 'codex-cli') return false;
       return (item.status === 'running' || (item.status === 'blocked' && attempt?.outcome === 'uncertain'))
         && attempt.sessionKey === event.sessionKey && (!attempt.runId || attempt.runId === event.runId);
     });
@@ -188,7 +227,7 @@ export class HotelRuntime {
     await this.consumeResult(task, text, event.runId);
   }
 
-  private async consumeResult(task: HotelTask, text: string, runId?: string): Promise<void> {
+  private async consumeResult(task: HotelTask, text: string, runId?: string, origin: 'gateway' | 'codex-cli' = 'gateway'): Promise<void> {
     const attempt = task.attempts.at(-1)!;
     try {
       const envelope = parseHotelResult(text, task.id, attempt.id);
@@ -197,7 +236,7 @@ export class HotelRuntime {
       }
       if (runId) await this.service.markDispatched(task.id, attempt.id, runId);
       if (envelope.outcome === 'completed' && envelope.result) {
-        await this.returnResult(task.id, attempt.id, envelope.result);
+        await this.returnResult(task.id, attempt.id, envelope.result, origin);
       } else {
         await this.service.failTask(task.id, attempt.id, envelope.error ?? 'Agent 未完成任务', false);
       }
@@ -208,7 +247,7 @@ export class HotelRuntime {
     this.onChange();
   }
 
-  async returnResult(taskId: string, attemptId: string, result: HotelTaskResult, origin: 'gateway' | 'owner' | 'bridge' = 'gateway'): Promise<HotelTask> {
+  async returnResult(taskId: string, attemptId: string, result: HotelTaskResult, origin: 'gateway' | 'owner' | 'bridge' | 'codex-cli' = 'gateway'): Promise<HotelTask> {
     const returned = await this.service.submitResult(taskId, attemptId, result, origin);
     await this.ensureSupervisorReview(returned);
     this.onChange();
@@ -223,7 +262,7 @@ export class HotelRuntime {
       if (supervisor?.enabled && supervisor.agentId && supervisor.agentId !== returned.assignedAgentId) {
         try {
           const review = await this.service.createSupervisorReview(returned.id);
-          if (review.status === 'draft') await this.service.queueTask(review.id);
+          if (review.status === 'draft') await this.service.queueTask(review.id, 'system');
         } catch (error) {
           // The owner's manual review remains available; never discard a valid worker result.
           this.logError(error);
@@ -248,6 +287,12 @@ export class HotelRuntime {
     }
     const attempt = task.attempts.at(-1);
     if (!attempt) throw new Error('任务尚未派发，无会话可核对');
+    if (attempt.executor === 'codex-cli') {
+      if (!this.codex) throw new Error('Native executor unavailable; do not redispatch');
+      const receipt = await this.codex.reconcile(task);
+      await this.consumeResult(task, receipt.text, receipt.runId, 'codex-cli');
+      return (await this.service.snapshot()).tasks.find((item) => item.id === taskId)!;
+    }
     const history = await this.gateway.rpc<{ messages?: unknown[] }>('chat.history', { sessionKey: attempt.sessionKey, limit: 50 }, 20000);
     const entries = Array.isArray(history?.messages) ? history.messages : [];
     for (const entry of [...entries].reverse()) {
@@ -271,6 +316,12 @@ export class HotelRuntime {
     if (!task) throw new Error('任务不存在');
     const attempt = task.attempts.at(-1);
     if ((task.status === 'running' || (task.status === 'blocked' && attempt?.outcome === 'uncertain')) && attempt) {
+      if (attempt.executor === 'codex-cli') {
+        if (!this.codex || !await this.codex.cancel(task)) throw new Error('Native process cancellation unconfirmed; reconcile its receipt first');
+        const current = (await this.service.snapshot()).tasks.find((item) => item.id === taskId)!;
+        if (current.status === 'needs_review' || current.status === 'succeeded') return current;
+        const cancelled = await this.service.cancelTask(taskId); this.onChange(); return cancelled;
+      }
       // A cancellation is only confirmed after Gateway acknowledges it.
       const result = await this.gateway.rpc<{ aborted?: boolean; runIds?: string[] }>('chat.abort', {
         sessionKey: attempt.sessionKey, ...(attempt.runId ? { runId: attempt.runId } : {}),
@@ -310,9 +361,14 @@ const runtimes = new WeakMap<GatewayManager, Promise<HotelRuntime>>();
 export function getHotelRuntime(ctx: HostApiContext): Promise<HotelRuntime> {
   let runtime = runtimes.get(ctx.gatewayManager);
   if (!runtime) {
-    runtime = getHotelService().then((service) => new HotelRuntime(service, ctx.gatewayManager, {
+    runtime = getHotelService().then(async (service) => {
+      const { app } = await import('electron');
+      const { join } = await import('node:path');
+      return new HotelRuntime(service, ctx.gatewayManager, {
+      codex: new CodexCliExecutor(join(app.getPath('userData'), 'hotel-codex-executor.json')),
       onChange: () => ctx.eventBus.emit('hotel:changed', { at: new Date().toISOString() }),
-    }));
+    });
+    });
     runtimes.set(ctx.gatewayManager, runtime);
   }
   return runtime;

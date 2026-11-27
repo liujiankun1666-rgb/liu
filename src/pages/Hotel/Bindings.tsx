@@ -15,7 +15,7 @@ export function Bindings({ propertyId, bindings, agents, busy, run }: { property
     {agents.length === 0 && <Notice>当前未读到已有 Agent。请确认本机 ClawX 配置已加载，刷新后再绑定。</Notice>}
     <div className="grid gap-4 xl:grid-cols-2">{HOTEL_ROLES.map((role) => {
       const binding = bindings.find((entry) => entry.propertyId === propertyId && entry.role === role);
-      return <BindingCard key={`${propertyId}-${role}-${binding?.updatedAt ?? 'new'}`} propertyId={propertyId} role={role} binding={binding} agents={agents} busy={busy} run={run} />;
+      return <BindingCard key={`${propertyId}-${role}-${binding?.updatedAt ?? 'new'}`} propertyId={propertyId} role={role} binding={binding} agents={agents.filter((agent) => agent.executionBackend !== 'codex-cli' || role === 'codex')} busy={busy} run={run} />;
     })}</div>
   </div>;
 }
@@ -29,7 +29,7 @@ function BindingCard({ propertyId, role, binding, agents, busy, run }: { propert
   const [policyError, setPolicyError] = useState('');
   async function checkPolicy() {
     setChecking(true);
-    try { setPolicy(await hotelApi.executionPolicy(agentId, role === 'codex' ? 'code' : 'analysis')); setPolicyError(''); }
+    try { setPolicy(await hotelApi.executionPolicy(agentId, role === 'codex' ? 'code' : 'analysis', propertyId)); setPolicyError(''); }
     catch (error) { setPolicyError(error instanceof Error ? error.message : String(error)); }
     finally { setChecking(false); }
   }

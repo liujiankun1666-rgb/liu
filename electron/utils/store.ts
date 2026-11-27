@@ -6,6 +6,7 @@
 import { randomBytes } from 'crypto';
 import { app } from 'electron';
 import { resolveSupportedLanguage } from '../../shared/language';
+import { isLocalOnboarding } from './local-onboarding';
 
 // Lazy-load electron-store (ESM module)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,12 +79,12 @@ function createDefaultSettings(): AppSettings {
     language: resolveSupportedLanguage(getSystemLocale()),
     startMinimized: false,
     launchAtStartup: false,
-    telemetryEnabled: true,
+    telemetryEnabled: !isLocalOnboarding(),
     machineId: '',
     hasReportedInstall: false,
 
     // Gateway
-    gatewayAutoStart: true,
+    gatewayAutoStart: !isLocalOnboarding(),
     gatewayPort: 18789,
     gatewayToken: generateToken(),
     proxyEnabled: false,
@@ -95,7 +96,7 @@ function createDefaultSettings(): AppSettings {
 
     // Update
     updateChannel: 'stable',
-    autoCheckUpdate: true,
+    autoCheckUpdate: !isLocalOnboarding(),
     autoDownloadUpdate: false,
     skippedVersions: [],
 

@@ -306,7 +306,7 @@ export class HotelService {
       return task;
     });
   }
-  queueTask(id: string): Promise<HotelTask> {
+  queueTask(id: string, actor: 'owner' | 'bridge' | 'system' = 'owner'): Promise<HotelTask> {
     return this.transaction((state) => {
       const task = this.task(state, id);
       if (!['draft', 'queued', 'blocked', 'awaiting_approval'].includes(task.status)) throw new HotelDomainError('Task cannot be queued in its current state', 409);
@@ -318,11 +318,11 @@ export class HotelService {
           task.status = 'blocked'; task.blockedReason = 'Approved plan is recorded; the production execution adapter is not connected. No external action was performed';
         } else { task.status = 'awaiting_approval'; delete task.blockedReason; }
       } else { task.status = 'queued'; delete task.blockedReason; }
-      this.touch(task); this.audit(state, task.propertyId, 'task.queued', task.status, id);
+      this.touch(task); this.audit(state, task.propertyId, 'task.queued', task.status, id, actor);
       return task;
     });
   }
-  claimTask(id: string, options: { availableAgentIds: string[]; leaseMs?: number; expectedAgentId?: string; expectedPlanVersion?: number }): Promise<HotelTask> {
+  claimTask(id: string, options: { availableAgentIds: string[]; leaseMs?: number; expectedAgentId?: string; expectedPlanVersion?: number; executor?: 'gateway' | 'codex-cli' }): Promise<HotelTask> {
     return this.transaction((state) => {
       const task = this.task(state, id);
       if (task.status !== 'queued') throw new HotelDomainError('Only queued tasks can start', 409);
@@ -336,12 +336,13 @@ export class HotelService {
       if (!binding?.enabled || !binding.agentId || !options.availableAgentIds.includes(binding.agentId)) throw new HotelDomainError('Role is not enabled and bound to an available existing Agent', 409);
       if (options.expectedAgentId !== undefined && options.expectedAgentId !== binding.agentId) throw new HotelDomainError('Agent binding changed after execution policy inspection; inspect the new Agent before dispatch', 409);
       if (task.reviewTarget) this.reviewTarget(state, task, binding.agentId);
+      if (options.executor === 'codex-cli' && (task.role !== 'codex' || task.action !== 'code' || task.reviewTarget)) throw new HotelDomainError('Native Codex only executes technical code tasks');
       const leaseMs = integer(options.leaseMs ?? 15 * 60 * 1000, 'leaseMs', 1000, 24 * 60 * 60 * 1000);
       this.preserveCurrentResult(task);
       const attemptId = this.id();
-      task.attempts.push({ id: attemptId, number: task.attempts.length + 1, sessionKey: `agent:${binding.agentId}:hotel:${task.id}:${attemptId}`, dispatchKey: `hotel:${task.id}:${attemptId}`, startedAt: this.stamp(), leaseExpiresAt: new Date(this.now().getTime() + leaseMs).toISOString() });
+      task.attempts.push({ id: attemptId, number: task.attempts.length + 1, executor: options.executor ?? 'gateway', sessionKey: `${options.executor === 'codex-cli' ? 'codex-cli' : 'agent'}:${binding.agentId}:hotel:${task.id}:${attemptId}`, dispatchKey: `hotel:${task.id}:${attemptId}`, startedAt: this.stamp(), leaseExpiresAt: new Date(this.now().getTime() + leaseMs).toISOString() });
       task.assignedAgentId = binding.agentId; task.status = 'running'; delete task.blockedReason; delete task.review; delete task.result; delete task.resultOrigin;
-      this.touch(task); this.audit(state, task.propertyId, 'attempt.reserved', `Attempt ${attemptId} persisted before sending`, id, 'gateway');
+      this.touch(task); this.audit(state, task.propertyId, 'attempt.reserved', `Attempt ${attemptId} persisted before sending`, id, options.executor ?? 'gateway');
       return task;
     });
   }
@@ -352,14 +353,16 @@ export class HotelService {
         if (attempt.runId && attempt.runId !== runId) throw new HotelDomainError('Gateway run id mismatch', 409);
         attempt.runId = required(runId, 'runId', 300);
       }
-      this.touch(task); this.audit(state, task.propertyId, 'attempt.acknowledged', attempt.runId ?? 'Gateway acknowledged the dispatch', id, 'gateway');
+      this.touch(task); this.audit(state, task.propertyId, 'attempt.acknowledged', attempt.runId ?? 'Executor acknowledged the dispatch', id, attempt.executor ?? 'gateway');
       return task;
     });
   }
-  submitResult(id: string, attemptId: string, result: HotelTaskResult, origin: 'gateway' | 'owner' | 'bridge' = 'gateway'): Promise<HotelTask> {
+  submitResult(id: string, attemptId: string, result: HotelTaskResult, origin: 'gateway' | 'owner' | 'bridge' | 'codex-cli' = 'gateway'): Promise<HotelTask> {
     return this.transaction((state) => {
       const task = this.task(state, id); const attempt = this.activeAttempt(task, attemptId);
-      if (!['gateway', 'owner', 'bridge'].includes(origin)) throw new HotelDomainError('Invalid result origin');
+      if (!['gateway', 'owner', 'bridge', 'codex-cli'].includes(origin)) throw new HotelDomainError('Invalid result origin');
+      if (attempt.executor === 'codex-cli' && origin !== 'codex-cli') throw new HotelDomainError('Native technical results only accept the correlated Codex executor receipt', 403);
+      if (origin === 'codex-cli' && (attempt.executor !== 'codex-cli' || task.role !== 'codex' || task.action !== 'code')) throw new HotelDomainError('Native result does not match the active technical executor');
       if (task.reviewTarget && origin !== 'gateway') throw new HotelDomainError('Supervisor assessments must originate from the correlated Gateway execution', 403);
       task.result = validateHotelResult(result);
       task.resultOrigin = origin;
@@ -410,7 +413,7 @@ export class HotelService {
       const task = this.task(state, id); const attempt = this.activeAttempt(task, attemptId);
       attempt.error = required(error, 'error', 10000); attempt.outcome = uncertain ? 'uncertain' : 'failed'; attempt.endedAt = this.stamp();
       task.status = uncertain ? 'blocked' : 'failed'; task.blockedReason = attempt.error;
-      this.touch(task); this.audit(state, task.propertyId, uncertain ? 'attempt.uncertain' : 'attempt.failed', attempt.error, id, 'gateway');
+      this.touch(task); this.audit(state, task.propertyId, uncertain ? 'attempt.uncertain' : 'attempt.failed', attempt.error, id, attempt.executor ?? 'gateway');
       return task;
     });
   }

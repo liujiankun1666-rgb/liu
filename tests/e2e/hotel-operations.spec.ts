@@ -1,3 +1,4 @@
+import { CALLBACK_RECEIVED_HTML } from '../../electron/utils/openai-codex-oauth';
 import { closeElectronApp, expect, getStableWindow, test } from './fixtures/electron';
 
 // These tests use the real Host API and isolated Electron user-data directory.
@@ -9,6 +10,7 @@ test.describe('Hotel operations command center', () => {
       const page = await getStableWindow(app);
       await page.getByTestId('sidebar-nav-hotel').click();
       await expect(page.getByTestId('hotel-page-title')).toHaveText('酒店总管');
+      await expect(page.getByText(/OpenClaw Gateway/)).toBeVisible();
       await expect(page.getByText('该日期尚无已验收经营指标')).toBeVisible();
       await expect(page.getByText('待接入', { exact: true })).toHaveCount(4);
 
@@ -69,4 +71,21 @@ test.describe('Hotel operations command center', () => {
       await page.screenshot({ path: testInfo.outputPath('hotel-approval-revision.png'), fullPage: true });
     } finally { await closeElectronApp(app); }
   });
+});
+
+test('labels native technical results as pending review without claiming Gateway execution', async ({ launchElectronApp, userDataDir }) => {
+  // Synthetic persisted UI fixture only; not evidence of a real executor run.
+  const { writeFile } = await import('node:fs/promises'); const { join } = await import('node:path');
+  const stamp = '2026-11-27T05:00:00Z';
+  const result = { summary: 'Synthetic native UI fixture', completedItems: ['fixture'], missingItems: [], sources: [], artifacts: [], dataPeriod: 'fixture', verificationNotes: 'UI fixture only', suggestedNextActions: [] };
+  await writeFile(join(userDataDir, 'hotel-command-center.json'), JSON.stringify({ schemaVersion: 1, revision: 1, properties: [{ id: 'xingcheng-aigong', name: '测试门店', city: '测试', timezone: 'Asia/Shanghai', createdAt: stamp }], bindings: [], knowledge: [], schedules: [], audit: [], tasks: [{ id: 'native-ui-fixture', propertyId: 'xingcheng-aigong', title: '原生技术结果UI测试', objective: 'UI fixture only', role: 'codex', action: 'code', priority: 'normal', status: 'needs_review', dependencies: [], inputs: '', acceptanceCriteria: ['source label'], knowledgeIds: [], idempotencyKey: 'native-ui-fixture', requestHash: 'fixture', planVersion: 1, attempts: [{ id: 'fixture-attempt', executor: 'codex-cli', number: 1, sessionKey: 'codex-cli:fixture', dispatchKey: 'fixture', startedAt: stamp, leaseExpiresAt: stamp, endedAt: stamp, outcome: 'returned' }], assignedAgentId: 'codex-cli-technical', maxAttempts: 1, createdAt: stamp, updatedAt: stamp, result, resultOrigin: 'codex-cli' }] }));
+  const app = await launchElectronApp({ skipSetup: true });
+  try { const page = await getStableWindow(app); await page.getByTestId('sidebar-nav-hotel').click(); await page.getByRole('tab', { name: '任务与审批' }).click(); await page.getByRole('button', { name: '原生技术结果UI测试', exact: true }).click(); await expect(page.getByText(/原生Codex技术执行器回传/)).toBeVisible(); await expect(page.getByTestId('hotel-task-detail').getByText('待验收', { exact: true })).toBeVisible(); }
+  finally { await closeElectronApp(app); }
+});
+
+test('renders OAuth callback receipt without premature success', async ({ launchElectronApp }) => {
+  const app = await launchElectronApp({ skipSetup: true });
+  try { const page = await getStableWindow(app); await page.setContent(CALLBACK_RECEIVED_HTML); await expect(page.getByText(/Authorization callback received/)).toBeVisible(); await expect(page.getByText(/token exchange may still fail/)).toBeVisible(); await expect(page.getByText(/Authentication successful/)).toHaveCount(0); }
+  finally { await closeElectronApp(app); }
 });

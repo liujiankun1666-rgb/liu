@@ -112,6 +112,12 @@ PMS・販売チャネルのアカウント、Codex の実行環境、リモー�
 
 [機能一覧](docs/hotel-operations/README.md)、[役割指示](docs/hotel-operations/roles.md)、[タスク・結果プロトコル](docs/hotel-operations/protocol.md)、[現場での接続確認](docs/hotel-operations/integration.md)を参照してください（中国語）。
 
+ローカル接続確認は明示した独立 userData を使用し、自動修復・更新を停止します。E2E ではなく通常の Electron 実行です。固定 OpenClaw はローカル CLI 認証を同期する可能性があるため、実行前に[起動の制限とローカルレポート連携](docs/hotel-operations/local-onboarding.md)を確認してください。
+
+独立した Codex CLI アダプターは Gateway を起動せず、制限付き技術タスクを実行できます。各実行の権限を検証し、結果は独立した確認待ちになります。[技術実行アダプター](docs/hotel-operations/native-codex.md)を参照してください。ローカル検証だけではクラウド ChatGPT 接続の証明になりません。
+
+現地検証の匿名化サマリーと未接続項目は [TASK-011 検証](docs/hotel-operations/task-011-verification.md)、正式なプライベート接続の準備は [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md) を参照してください。
+
 ### 📡 マルチチャネル管理
 複数のAIチャネルを同時に設定・監視できます。各チャネルは独立して動作するため、異なるタスクに特化したエージェントを実行できます。
 現在は各チャンネルで複数アカウントを扱え、Channels ページでアカウントの Agent 紐付けやデフォルトアカウント切替を直接管理できます。

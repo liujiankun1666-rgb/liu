@@ -7,7 +7,6 @@ import { getHotelRuntime } from '../../services/hotel/runtime';
 import { readHotelJson } from '../../services/hotel/http-body';
 import { createHotelWorkflow } from '../../services/hotel/workflows';
 import { getHotelBridge } from '../../services/hotel/bridge';
-import { inspectHotelExecutionPolicy } from '../../services/hotel/execution-policy';
 
 export async function handleHotelRoutes(req: IncomingMessage, res: ServerResponse, url: URL, ctx: HostApiContext): Promise<boolean> {
   if (!url.pathname.startsWith('/api/hotel/')) return false;
@@ -26,7 +25,7 @@ export async function handleHotelRoutes(req: IncomingMessage, res: ServerRespons
     if (url.pathname === '/api/hotel/execution-policy' && req.method === 'GET') {
       const action = url.searchParams.get('action') ?? 'analysis';
       if (!['read', 'analysis', 'code'].includes(action)) throw new HotelDomainError('无效执行类型');
-      sendJson(res, 200, { success: true, ...await inspectHotelExecutionPolicy(url.searchParams.get('agentId') ?? '', action as 'read' | 'analysis' | 'code') }); return true;
+      sendJson(res, 200, { success: true, ...await runtime.inspectExecutionPolicy(url.searchParams.get('agentId') ?? '', action as 'read' | 'analysis' | 'code', url.searchParams.get('propertyId') ?? undefined) }); return true;
     }
     if (url.pathname === '/api/hotel/bridge') {
       const bridge = await getHotelBridge();

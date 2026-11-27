@@ -28,7 +28,7 @@ ChatGPT 的总体判断与技术验收，不替代服务端独立验收机制或
 
 ClawX 中的 OpenAI/Codex 模型配置，与接通独立 Codex 技术执行端是两件事。
 本仓库有多个模型提供商定义，但具体账号、地区和模型是否可用须现场核实，不能据此保证任一替代模型可用。
-地区错误目前缺少原始错误和发生阶段，不预判根因，不通过改入口或改提示词宣称地区限制已消除。
+现场已核到提供商 OAuth 换令牌阶段的地区拒绝；另一次 Gateway 模型网络错误原因未细分，两者不合并归因。脱敏范围见 [TASK-011 验证摘要](task-011-verification.md)，不通过改入口或改提示词宣称地区限制已消除。
 
 代码依据：[提供商定义](../../electron/shared/providers/registry.ts)、[OAuth 处理](../../electron/utils/browser-oauth.ts)、[执行权限检查](../../electron/services/hotel/execution-policy.ts)。
 
@@ -36,9 +36,9 @@ ClawX 中的 OpenAI/Codex 模型配置，与接通独立 Codex 技术执行端�
 
 | 链路 | 已有内容 | 尚需完成 |
 | --- | --- | --- |
-| ChatGPT ↔ 管理执行层 | 按门店限定的状态、建单、派发及普通结果回传接口；本机 stdio MCP 适配 | 当前聊天到运营电脑的真实认证连接；远程 HTTPS 接入层不在现有实现中 |
+| ChatGPT ↔ 管理执行层 | 按门店限定的状态、建单、派发及普通结果回传接口；本机 stdio MCP 适配 | 当前聊天到运营电脑的真实认证连接；可复用[官方 Secure MCP Tunnel](secure-mcp-tunnel.md)，不要求公开 Host API，账户关联及云端调用仍待实测 |
 | 管理层 ↔ 业务执行器 | 从 OpenClaw 配置发现 Agent，通过 Gateway 派发并匹配任务/批次/会话 | 用户已有酒店岗位在 Codex 中，不能直接当成 OpenClaw Agent；需要核实可用适配方式与职责映射 |
-| 管理层 ↔ Codex 技术执行端 | 技术岗位、关联技术工单和代码任务权限检查 | 独立 Codex 执行器接入及权限验证；不能删除现有检查来冒充接通 |
+| 管理层 ↔ Codex 技术执行端 | 技术岗位、关联技术工单和代码任务权限检查 | 已增加[独立原生Codex适配](native-codex.md)，只处理受限技术工单；实际模型、认证、权限与回传仍须逐环境验证，不删除原检查 |
 | 执行结果 ↔ 验收 ↔ ChatGPT | 持久任务、结果历史、独立验收、审批版本和桥接状态查询代码 | 一次从实际 ChatGPT 发起并重新读回状态的完整联调，以及实际断连、重复请求和重启检查 |
 
 代码依据：[运行时](../../electron/services/hotel/runtime.ts)、[桥接](../../electron/services/hotel/bridge.ts)、[任务领域](../../electron/services/hotel/domain.ts)、[持久存储](../../electron/services/hotel/store.ts)。

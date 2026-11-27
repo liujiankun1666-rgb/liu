@@ -125,7 +125,7 @@ export class HotelBridge {
       } else if (name === 'hotel_queue_task') {
         const value = await task();
         if (!['read', 'analysis', 'code'].includes(value.action)) throw new HotelDomainError('Business plans must be submitted and approved in the owner UI', 403);
-        output = await runtime.service.queueTask(value.id);
+        output = await runtime.service.queueTask(value.id, 'bridge');
       } else if (name === 'hotel_dispatch_task') {
         output = await runtime.dispatch((await task()).id);
       } else if (name === 'hotel_submit_result') {

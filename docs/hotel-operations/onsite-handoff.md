@@ -49,7 +49,7 @@
 正常启动有仓库既有的同步行为：技能/插件安装或升级、工作区上下文合并，以及 Gateway 启动时的认证、Token 和浏览器配置同步。
 关闭 Gateway 自动启动不会关闭全部启动副作用；不能承诺启动新包完全不触碰原配置。见 [`index.ts`](../../electron/main/index.ts) 与 [`config-sync.ts`](../../electron/gateway/config-sync.ts)。
 新旧版本沿用同一 `appId` 和产品名，换安装目录不隔离数据；OpenClaw 配置仍从用户主目录读取。
-`CLAWX_USER_DATA_DIR` 在 Electron 中只于 `CLAWX_E2E=1` 时生效，不是正常运营的通用隔离开关。
+未启用显式 `CLAWX_LOCAL_ONBOARDING=1` 时，`CLAWX_USER_DATA_DIR` 在 Electron 中只于 `CLAWX_E2E=1` 时生效。新增[本机受控联调](local-onboarding.md)允许正常模式使用明确的独立 userData；此开关只隔离应用 userData，不隔离 OpenClaw 配置或其对 Codex 认证的读取，不是完整认证沙箱。
 若必须完全不触碰原环境，先用独立操作系统用户或虚拟机验证；E2E 模式不能冒充真实运营接入。
 
 ## 安装包路径与发布边界
@@ -101,3 +101,7 @@ Windows NSIS 安装器会处理旧进程、替换程序、修改 PATH，并尝�
 - 平台接入和权限的已验证/未验证清单；生产写入仍未接入时明确保持阻塞。
 
 详细权限与联调步骤见[接入与现场联调](integration.md)，任务字段见[协议](protocol.md)。
+
+## 本机正常模式补充
+
+若现场没有既有 ClawX，不能把 Codex 聊天标为已连通 Agent。独立新建受限运行时须按明确授权执行，先阅读[本机受控联调](local-onboarding.md)的启动副作用、固定 OpenClaw CLI 认证同步边界和本地报表交接说明。

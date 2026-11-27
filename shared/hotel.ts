@@ -55,7 +55,7 @@ export interface HotelApproval {
 }
 export interface HotelReview { decision: 'accept' | 'return'; actor: 'owner' | 'supervisor'; note: string; reviewedAt: string; reviewerTaskId?: string }
 export interface HotelResultHistoryEntry {
-  attemptId: string; recordedAt: string; origin: 'gateway' | 'owner' | 'bridge';
+  attemptId: string; recordedAt: string; origin: 'gateway' | 'owner' | 'bridge' | 'codex-cli';
   result: HotelTaskResult; review?: HotelReview;
 }
 export interface HotelPlanHistoryEntry {
@@ -64,6 +64,8 @@ export interface HotelPlanHistoryEntry {
   plan?: HotelPlan; approval?: HotelApproval;
 }
 export interface HotelAttempt {
+  /** Explicit runtime identity; omitted means the historical Gateway implementation. */
+  executor?: 'gateway' | 'codex-cli';
   id: string; number: number; sessionKey: string; dispatchKey: string;
   startedAt: string; leaseExpiresAt: string; runId?: string; endedAt?: string;
   outcome?: 'returned' | 'failed' | 'uncertain' | 'cancelled'; error?: string;
@@ -76,7 +78,7 @@ export interface HotelTask {
   acceptanceCriteria: string[]; knowledgeIds: string[]; idempotencyKey: string; requestHash: string;
   planVersion: number; plan?: HotelPlan; approval?: HotelApproval;
   review?: HotelReview; result?: HotelTaskResult;
-  resultOrigin?: 'gateway' | 'owner' | 'bridge';
+  resultOrigin?: 'gateway' | 'owner' | 'bridge' | 'codex-cli';
   resultHistory?: HotelResultHistoryEntry[];
   planHistory?: HotelPlanHistoryEntry[];
   assignedAgentId?: string; attempts: HotelAttempt[]; maxAttempts: number;
@@ -128,7 +130,7 @@ export interface HotelReport {
 export interface HotelTaskTemplate {
   id: string; title: string; role: HotelRole; action: HotelAction; objective: string; acceptanceCriteria: string[];
 }
-export interface HotelAgentOption { id: string; name: string; modelDisplay?: string; mainSessionKey?: string }
+export interface HotelAgentOption { executionBackend?: 'gateway' | 'codex-cli'; id: string; name: string; modelDisplay?: string; mainSessionKey?: string }
 export interface HotelCapability { id: string; label: string; status: 'implemented' | 'needs_connection' | 'unavailable'; detail: string }
 export interface HotelSnapshotResponse {
   success: boolean; snapshot: HotelSnapshot; agents: HotelAgentOption[];

@@ -11,15 +11,15 @@ const SCOPE = 'openid profile email offline_access';
 const JWT_CLAIM_PATH = 'https://api.openai.com/auth';
 const ORIGINATOR = 'codex_cli_rs';
 
-const SUCCESS_HTML = `<!doctype html>
+export const CALLBACK_RECEIVED_HTML = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Authentication successful</title>
+  <title>Authorization callback received</title>
 </head>
 <body>
-  <p>Authentication successful. Return to ClawX to continue.</p>
+  <p>Authorization callback received. Return to ClawX for the final sign-in result; token exchange may still fail.</p>
 </body>
 </html>`;
 
@@ -173,7 +173,7 @@ function startLocalOAuthServer(state: string): Promise<OpenAICodexLocalServer | 
       lastCode = code;
       res.statusCode = 200;
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.end(SUCCESS_HTML);
+      res.end(CALLBACK_RECEIVED_HTML);
     } catch {
       res.statusCode = 500;
       res.end('Internal error');

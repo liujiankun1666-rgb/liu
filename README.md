@@ -112,6 +112,12 @@ Live PMS/channel accounts, the Codex execution environment, and remote ChatGPT c
 
 See the [implementation and feature matrix](docs/hotel-operations/README.md), [role instructions](docs/hotel-operations/roles.md), [task/result protocol](docs/hotel-operations/protocol.md), and [integration checklist](docs/hotel-operations/integration.md).
 
+Local controlled onboarding uses an explicit separate user-data directory and disables automatic startup repairs/updates. This is normal Electron mode, not E2E; pinned OpenClaw may still synchronize local CLI credentials. See [startup boundaries and local report handoff](docs/hotel-operations/local-onboarding.md) before dispatch.
+
+A separately verified native Codex CLI adapter can execute scoped technical code tasks without Gateway. It preserves workspace/network boundaries and returns results for independent review; see [native technical executor](docs/hotel-operations/native-codex.md). Local success does not establish a cloud ChatGPT connection.
+
+Public on-site verification and remaining connection gaps: [TASK-011 verification](docs/hotel-operations/task-011-verification.md). Private cloud connection preparation: [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md).
+
 ### 📡 Multi-Channel Management
 Configure and monitor multiple AI channels simultaneously. Each channel operates independently, allowing you to run specialized agents for different tasks.
 Each channel now supports multiple accounts, per-account agent binding, and switching the channel default account directly from the Channels page.

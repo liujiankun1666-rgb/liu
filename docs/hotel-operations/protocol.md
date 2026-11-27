@@ -271,3 +271,7 @@ Agent 不能填写 `publication`。只有方案已验收且分数不低于 80 �
 | `GET` / `POST` / `DELETE /api/hotel/bridge` | 桥接状态、轮换授权、撤销 |
 
 MCP 暴露的是另一组受限工具，详见[接入文档](integration.md)，不与老板 Host API 令牌混用。
+
+## 原生技术执行身份
+
+HotelAttempt新增可选executor（gateway或codex-cli，旧记录省略时仍为Gateway）。原生sessionKey以codex-cli开头，runId关联真实CLI thread与当前attempt；resultOrigin增加codex-cli。native attempt只接受同执行器实际回执，不能由bridge/owner/Gateway覆盖。审批与独立验收权限不变，技术结果默认needs_review。桥接入队审计actor明确为bridge；旧历史事件不倒改。详细限制见[native-codex.md](native-codex.md)。

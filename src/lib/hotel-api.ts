@@ -39,7 +39,7 @@ export const hotelApi = {
   saveKnowledge: (input: SaveHotelKnowledgeInput) => request<{ success: boolean }>('/api/hotel/knowledge', 'POST', input),
   saveSchedule: (input: SaveHotelScheduleInput) => request<{ success: boolean }>('/api/hotel/schedules', 'POST', input),
   createProperty: (input: Omit<HotelProperty, 'createdAt'>) => request<{ success: boolean }>('/api/hotel/properties', 'POST', input),
-  executionPolicy: (agentId: string, action: 'analysis' | 'read' | 'code') => request<{ success: boolean; allowed: boolean; reason: string; verifiedTools: string[] }>(`/api/hotel/execution-policy?agentId=${encodeURIComponent(agentId)}&action=${action}`),
+  executionPolicy: (agentId: string, action: 'analysis' | 'read' | 'code', propertyId?: string) => request<{ success: boolean; allowed: boolean; reason: string; verifiedTools: string[] }>(`/api/hotel/execution-policy?agentId=${encodeURIComponent(agentId)}&action=${action}${propertyId ? `&propertyId=${encodeURIComponent(propertyId)}` : ''}`),
   bridge: () => request<HotelBridgeState>('/api/hotel/bridge'),
   enableBridge: (propertyIds: string[], allowDispatch: boolean) => request<HotelBridgeState>('/api/hotel/bridge', 'POST', { propertyIds, allowDispatch }),
   revokeBridge: () => request<{ success: boolean }>('/api/hotel/bridge', 'DELETE'),

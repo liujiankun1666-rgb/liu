@@ -11,6 +11,7 @@ import { BrowserWindow, app, ipcMain } from 'electron';
 import { logger } from '../utils/logger';
 import { EventEmitter } from 'events';
 import { setQuitting } from './app-state';
+import { assertUpdatesAllowed, isLocalOnboarding } from '../utils/local-onboarding';
 
 /** Base CDN URL (without trailing channel path) */
 const OSS_BASE_URL = 'https://oss.intelli-spectrum.com';
@@ -60,7 +61,7 @@ export class AppUpdater extends EventEmitter {
     });
     
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.autoInstallOnAppQuit = !isLocalOnboarding();
     
     autoUpdater.logger = {
       info: (msg: string) => logger.info('[Updater]', msg),
@@ -174,6 +175,7 @@ export class AppUpdater extends EventEmitter {
    * final status so the UI never gets stuck in 'checking'.
    */
   async checkForUpdates(): Promise<UpdateInfo | null> {
+    assertUpdatesAllowed();
     try {
       const result = await autoUpdater.checkForUpdates();
 
@@ -205,6 +207,7 @@ export class AppUpdater extends EventEmitter {
    * Download available update
    */
   async downloadUpdate(): Promise<void> {
+    assertUpdatesAllowed();
     try {
       await autoUpdater.downloadUpdate();
     } catch (error) {
@@ -225,6 +228,7 @@ export class AppUpdater extends EventEmitter {
    * the window cleanly while ShipIt runs independently to replace the app.
    */
   quitAndInstall(): void {
+    assertUpdatesAllowed();
     logger.info('[Updater] quitAndInstall called');
     setQuitting();
     autoUpdater.quitAndInstall();
@@ -273,7 +277,7 @@ export class AppUpdater extends EventEmitter {
    * Set auto-download preference
    */
   setAutoDownload(enable: boolean): void {
-    autoUpdater.autoDownload = enable;
+    autoUpdater.autoDownload = isLocalOnboarding() ? false : enable;
   }
 
   /**

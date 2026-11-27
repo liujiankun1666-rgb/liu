@@ -28,6 +28,7 @@ import { logger } from '../utils/logger';
 import { prependPathEntry } from '../utils/env-path';
 import { copyPluginFromNodeModules, fixupPluginManifest, cpSyncSafe } from '../utils/plugin-install';
 import { stripSystemdSupervisorEnv } from './config-sync-env';
+import { isLocalOnboarding } from '../utils/local-onboarding';
 
 
 export interface GatewayLaunchContext {
@@ -236,6 +237,13 @@ function ensureExtensionDepsResolvable(openclawDir: string): void {
 export async function syncGatewayConfigBeforeLaunch(
   appSettings: Awaited<ReturnType<typeof getAllSettings>>,
 ): Promise<void> {
+  if (isLocalOnboarding()) {
+    // Authentication for the explicitly started local Gateway is necessary.
+    // Do not repair models, migrate channels, alter browser policy or upgrade plugins.
+    await syncGatewayTokenToConfig(appSettings.gatewayToken);
+    logger.info('Local onboarding Gateway sync: token only; automatic configuration repairs skipped');
+    return;
+  }
   await syncProxyConfigToOpenClaw(appSettings, { preserveExistingWhenDisabled: true });
 
   try {

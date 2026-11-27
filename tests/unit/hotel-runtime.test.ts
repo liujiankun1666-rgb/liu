@@ -204,3 +204,39 @@ describe('structured result protocol', () => {
     expect(assistantText({ role: 'assistant', content: [{ type: 'text', text: 'maybe complete' }, { type: 'toolCall', name: 'read' }] })).toBe('');
   });
 });
+
+describe('separate native technical executor', () => {
+  it('runs without Gateway, isolates identity and prevents shared-bridge completion', async () => {
+    const h = await harness(); h.runtime.dispose();
+    h.gateway.getStatus = () => ({ state: 'stopped', port: 18789 });
+    let finish: (value: { text: string; runId: string; threadId: string; workspace: string }) => void = () => {};
+    const execute = vi.fn().mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const native = { describe: async () => ({ id: 'codex-cli-technical', name: 'native', executionBackend: 'codex-cli' as const }), inspect: async () => ({ allowed: true, reason: 'unit test fixture', verifiedTools: [] }), execute, reconcile: vi.fn(), cancel: vi.fn() };
+    const runtime = new HotelRuntime(h.service, h.gateway as never, { agents: async () => ({ agents: [], defaultAgentId: '' }) as never, codex: native, autoStart: false }); runtimes.push(runtime);
+    await runtime.snapshot();
+    await h.service.setBinding({ propertyId: 'xingcheng-aigong', role: 'codex', agentId: 'codex-cli-technical', enabled: true, notes: 'test fixture' });
+    const draft = await h.service.createTask({ propertyId: 'xingcheng-aigong', role: 'codex', action: 'code', title: 'native fixture', objective: 'test', acceptanceCriteria: ['real tools in integration test'], idempotencyKey: 'native-fixture' });
+    await h.service.queueTask(draft.id);
+    const [task, duplicate] = await Promise.all([runtime.dispatch(draft.id), runtime.dispatch(draft.id)]);
+    const attempt = task.attempts.at(-1)!;
+    expect(attempt.executor).toBe('codex-cli'); expect(attempt.sessionKey).toMatch(/^codex-cli:/);
+    expect(duplicate.attempts).toHaveLength(1); expect(execute).toHaveBeenCalledTimes(1); expect(h.gateway.rpc).not.toHaveBeenCalled();
+    for (const origin of ['bridge', 'owner', 'gateway'] as const) await expect(runtime.returnResult(task.id, attempt.id, evidence, origin)).rejects.toThrow('only accept');
+    await runtime.handleChat({ ...finalEvent(task), runId: 'fake-gateway' });
+    expect((await h.service.snapshot()).tasks[0].status).toBe('running');
+    finish({ text: JSON.stringify({ taskId: task.id, attemptId: attempt.id, outcome: 'completed', result: evidence }), runId: 'codex-cli:thread:attempt', threadId: 'thread', workspace: '/unit-fixture' });
+    await vi.waitFor(async () => expect((await h.service.snapshot()).tasks[0].status).toBe('needs_review'));
+    expect((await h.service.snapshot()).tasks[0].resultOrigin).toBe('codex-cli');
+    expect((await h.service.snapshot()).tasks[0].review).toBeUndefined();
+  });
+});
+
+it('rejects reserved native identity collisions instead of switching an OpenClaw binding', async () => {
+  const h = await harness(); h.runtime.dispose();
+  const inspect = vi.fn().mockResolvedValue({ allowed: true, reason: 'fixture', verifiedTools: [] });
+  const runtime = new HotelRuntime(h.service, h.gateway as never, { agents: async () => ({ agents: [{ id: 'codex-cli-technical', name: 'existing OpenClaw identity' }], defaultAgentId: 'codex-cli-technical' }) as never, codex: { describe: async () => ({ id: 'codex-cli-technical', name: 'native' }), inspect, execute: vi.fn(), reconcile: vi.fn(), cancel: vi.fn() }, autoStart: false });
+  runtimes.push(runtime); await runtime.snapshot();
+  expect((await runtime.inspectExecutionPolicy('codex-cli-technical', 'code', 'xingcheng-aigong')).allowed).toBe(false);
+  expect(inspect).not.toHaveBeenCalled();
+  await expect(runtime.inspectExecutionPolicy('codex-cli-technical', 'analysis', 'xingcheng-aigong')).rejects.toThrow('action=code');
+});
