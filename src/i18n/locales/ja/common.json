@@ -1,5 +1,6 @@
 {
     "sidebar": {
+    "hotel": "ホテル運営",
         "chat": "チャット",
         "newChat": "新しいチャット",
         "cronTasks": "定期タスク",

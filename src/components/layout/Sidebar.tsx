@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Network,
+  Hotel,
   Bot,
   Puzzle,
   Clock,
@@ -208,6 +209,7 @@ export function Sidebar() {
   }
 
   const navItems = [
+    { to: '/hotel', icon: <Hotel className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.hotel'), testId: 'sidebar-nav-hotel' },
     { to: '/models', icon: <Cpu className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.models'), testId: 'sidebar-nav-models' },
     { to: '/agents', icon: <Bot className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.agents'), testId: 'sidebar-nav-agents' },
     { to: '/channels', icon: <Network className="h-[18px] w-[18px]" strokeWidth={2} />, label: t('sidebar.channels'), testId: 'sidebar-nav-channels' },

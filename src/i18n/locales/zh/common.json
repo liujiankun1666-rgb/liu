@@ -1,5 +1,6 @@
 {
     "sidebar": {
+    "hotel": "酒店总管",
         "chat": "聊天",
         "newChat": "新对话",
         "cronTasks": "定时任务",

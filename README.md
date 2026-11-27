@@ -102,6 +102,14 @@ Communicate with AI agents through a modern chat experience. Support for multipl
 When you target another agent with `@agent`, ClawX switches into that agent's own conversation context directly instead of relaying through the default agent. Agent workspaces stay separate by default, and stronger isolation depends on OpenClaw sandbox settings.
 Each agent can also override its own `provider/model` runtime setting; agents without overrides continue inheriting the global default model.
 
+### 🏨 Hotel Command Center
+
+This branch adds **Hotel Command Center** (`/hotel`) for role bindings to existing agents, persistent tasks and dependencies, Gateway dispatch, structured result review, versioned business approvals, source-backed daily metrics, shared knowledge, schedules, and multiple properties. A separately scoped local MCP bridge supports compatible clients without giving them owner approval privileges.
+
+Live PMS/channel accounts, the Codex execution environment, and remote ChatGPT connectivity still require on-site integration. A role prompt is not a read-only sandbox; task dispatch checks the actual tool policy. Production price changes, payments, refunds, and publishing remain unavailable until a controlled adapter is connected. Douyin content below 80 points cannot be recorded as published; this workflow only records manual publication.
+
+See the [implementation and feature matrix](docs/hotel-operations/README.md), [role instructions](docs/hotel-operations/roles.md), [task/result protocol](docs/hotel-operations/protocol.md), and [integration checklist](docs/hotel-operations/integration.md).
+
 ### 📡 Multi-Channel Management
 Configure and monitor multiple AI channels simultaneously. Each channel operates independently, allowing you to run specialized agents for different tasks.
 Each channel now supports multiple accounts, per-account agent binding, and switching the channel default account directly from the Channels page.

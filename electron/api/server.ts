@@ -15,6 +15,9 @@ import { handleSkillRoutes } from './routes/skills';
 import { handleFileRoutes } from './routes/files';
 import { handleSessionRoutes } from './routes/sessions';
 import { handleCronRoutes } from './routes/cron';
+import { handleHotelRoutes } from './routes/hotel';
+import { handleHotelBridgeRequest } from '../services/hotel/bridge';
+import { getHotelRuntime } from '../services/hotel/runtime';
 import { sendJson, setCorsHeaders, requireJsonContentType } from './route-utils';
 
 type RouteHandler = (
@@ -35,6 +38,7 @@ const routeHandlers: RouteHandler[] = [
   handleFileRoutes,
   handleSessionRoutes,
   handleCronRoutes,
+  handleHotelRoutes,
   handleLogRoutes,
   handleUsageRoutes,
 ];
@@ -60,6 +64,8 @@ export function startHostApiServer(ctx: HostApiContext, port = getPort('CLAWX_HO
   const server = createServer(async (req, res) => {
     try {
       const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${port}`);
+      // Hotel MCP has its own property-scoped credential, never the Host API token.
+      if (await handleHotelBridgeRequest(req, res, requestUrl, ctx)) return;
       // ── CORS headers ─────────────────────────────────────────
       // Set origin-aware CORS headers early so every response
       // (including error responses) carries them consistently.
@@ -121,6 +127,10 @@ export function startHostApiServer(ctx: HostApiContext, port = getPort('CLAWX_HO
   server.listen(port, '127.0.0.1', () => {
     logger.info(`Host API server listening on http://127.0.0.1:${port}`);
   });
+
+  const hotelRuntime = getHotelRuntime(ctx);
+  void hotelRuntime.catch((error) => logger.warn('Hotel task center unavailable:', error));
+  server.once('close', () => { void hotelRuntime.then((runtime) => runtime.dispose()).catch(() => {}); });
 
   return server;
 }
