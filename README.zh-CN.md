@@ -119,6 +119,8 @@ ClawX 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 
 现场脱敏验证与未接通部分见 [TASK-011 验证摘要](docs/hotel-operations/task-011-verification.md)；正式私有连接准备见 [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md)。Gateway 最终文本可能包含工具调用前的说明；管理层保持严格回传校验，并核对同一执行批次的最后助手回传，不把工具输出或其他批次结果当完成。Gateway 历史只接受裸JSON或末尾唯一完整json代码块（可有前序说明）；拒绝多块、块后文字、工具内容和错批次。原生Codex回传仍按原严格格式。
 
+独立验收指令区分目标交付缺项与审查自身未完成：完成审查后可退回有缺项目标，无法核验必要证据时应报告审查阻塞。已有缺项继续阻止验收通过。详见[验收协议](docs/hotel-operations/protocol.md)；模型调用成功不代表独立验收已通过。
+
 ### 📡 多频道管理
 同时配置和监控多个 AI 频道。每个频道独立运行，允许你为不同任务运行专门的智能体。
 现在每个频道支持多个账号，并可在 Channels 页面直接完成账号绑定到 Agent 与默认账号切换。

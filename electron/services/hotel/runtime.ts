@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger';
 import type { HotelTask, HotelTaskResult, HotelSnapshotResponse, HotelCapability } from '../../../shared/hotel';
 import { HotelDomainError, HOTEL_TASK_TEMPLATES, type HotelService } from './domain';
 import { getHotelService } from './store';
-import { asRecord, assistantText, buildHotelBrief, gatewayHistoryResultText, parseHotelResult } from './gateway-payload';
+import { asRecord, assistantText, buildHotelBrief, gatewayHistoryResultText, lastAssistantText, parseHotelResult } from './gateway-payload';
 import { inspectHotelExecutionPolicy } from './execution-policy';
 import { CODEX_TECHNICAL_ID, CodexCliExecutor, type CodexTechnicalExecutor } from './codex-cli';
 
@@ -229,7 +229,7 @@ export class HotelRuntime {
     catch {
       // Gateway final text can aggregate the narration before a tool call with
       // the terminal answer. Keep the envelope parser strict: only the last
-      // eligible assistant turn from this exact attempt's history may replace it.
+      // assistant turn from this exact attempt's history may replace it, if eligible.
       let history: { messages?: unknown[] };
       try {
         history = await this.gateway.rpc('chat.history', { sessionKey: attempt.sessionKey, limit: 50 }, 20000);
@@ -241,7 +241,7 @@ export class HotelRuntime {
         return;
       }
       const entries = Array.isArray(history?.messages) ? history.messages : [];
-      const last = [...entries].reverse().map(assistantText).find(Boolean);
+      const last = lastAssistantText(entries);
       if (last) {
         try { text = gatewayHistoryResultText(last, task.id, attempt.id); }
         catch { /* Reject mismatched or malformed terminal answers; never scan older results. */ }
@@ -318,7 +318,7 @@ export class HotelRuntime {
     }
     const history = await this.gateway.rpc<{ messages?: unknown[] }>('chat.history', { sessionKey: attempt.sessionKey, limit: 50 }, 20000);
     const entries = Array.isArray(history?.messages) ? history.messages : [];
-    const last = [...entries].reverse().map(assistantText).find(Boolean);
+    const last = lastAssistantText(entries);
     if (last) {
       let text: string;
       try { text = gatewayHistoryResultText(last, task.id, attempt.id); }

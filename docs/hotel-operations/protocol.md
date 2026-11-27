@@ -85,6 +85,8 @@ Agent 最后输出单个 JSON 对象，或只包裹这个对象的 JSON 代码�
 
 `completed` 只表示 Agent 提交完毕。任务随后进入 `needs_review`，不是 `succeeded`。有 `missingItems` 的结果可展示和退回，但不能验收通过。
 
+`missingItems` 表示当前任务的验收标准尚未满足。只有不妨碍当前验收标准的数据局限才写入 `verificationNotes` 和 `summary`，后续核查建议写入 `suggestedNextActions`。例如任务只要求核对一份合成快照的计算与口径，无法推断真实经营原因属于适用范围说明；如果任务要求查明原因，缺少原因证据就是验收缺项。不能通过改字段名称隐藏未完成的要求。
+
 ### 回传来源与历史留存
 
 服务器记录当前结果的 `resultOrigin`：`gateway` 为关联 Agent 执行会话，`owner` 为老板手工录入，`bridge` 为桥接客户端。该字段由调用路径决定，不能用结果正文自行声明来源。
@@ -143,6 +145,16 @@ Agent 最后输出单个 JSON 对象，或只包裹这个对象的 JSON 代码�
 ```
 
 只有服务端创建的验收任务可以包含 `assessment`；普通任务不能通过附加该字段自行验收。禁止自审、跨店验收、验收旧结果以及验收另一个验收任务。`accept` 还要求原结果没有缺项且全部依赖已通过。通过的质量验收写明 `actor:"supervisor"` 和关联验收任务；总管自己的结果仍由老板验收。经营变更审批始终是独立的老板动作。
+
+验收任务的 `result.missingItems` 描述**本次审查是否完整**，不重复存放目标任务的缺项。两类缺项按以下规则处理：
+
+| 实际情况 | 合法回传 | 对目标的处理 |
+| --- | --- | --- |
+| 审查已完成，目标缺项或未满足验收标准 | `completed`，`assessment.decision:"return"`；在 `assessment.note` 列出目标缺项、依据与返修要求，审查自身 `missingItems:[]` | 退回原执行岗，保留旧结果及验收历史 |
+| 审查自身缺少必要证据或读取能力，无法形成完整结论 | `blocked`，`error` 说明审查阻塞及所需证据 | 不替目标作通过决定 |
+| 审查完整，固定目标无缺项、全部标准有证据满足，依赖和子任务已验收 | `completed`，`assessment.decision:"accept"`，审查自身 `missingItems:[]` | 服务端校验后才通过 |
+
+服务端同时拒绝审查自身不完整的 `accept` / `return`，以及目标仍有缺项的 `accept`。目标已登记的缺项即使被怀疑只是适用范围说明，也应先 `return`，由原执行岗核实、解释并按原流程提交新版本；不清空旧结果、不修改固定验收对象、不降低验收条件。
 
 带 `reviewTarget` 的验收结果只接受关联 Gateway 执行回传。MCP 的 `hotel_submit_result` 同时拒绝所有 `role:"supervisor"` 任务和所有带 `reviewTarget` 的任务；共享桥接令牌不能代替总管回传讨论或验收结果。老板手动验收应调用独立的 `review` 动作，不能向验收任务录入一份伪装成 Gateway 的结果。
 

@@ -176,6 +176,35 @@ describe('hotel Gateway orchestration', () => {
     expect(h.gateway.rpc.mock.calls.filter(([method]) => method === 'chat.send')).toHaveLength(1);
   });
 
+  describe.each(['handleChat', 'reconcile'] as const)('%s history boundary', (path) => {
+    it.each(['empty terminal', 'empty failed terminal', 'unfinished tool cycle', 'failed receipt', 'aborted receipt'])('does not reuse an older result after a later %s', async (kind) => {
+      const h = await harness();
+      const task = await h.runtime.dispatch((await queued(h.service)).id);
+      const older = finalEvent(task).message;
+      const tails: Record<string, unknown[]> = {
+        'empty terminal': [{ role: 'assistant', stopReason: 'stop', content: [] }],
+        'empty failed terminal': [{ role: 'assistant', stopReason: 'error', content: [], errorMessage: 'provider failed' }],
+        'unfinished tool cycle': [
+          { role: 'assistant', stopReason: 'toolUse', content: [{ type: 'toolCall', name: 'read' }] },
+          { role: 'toolResult', content: older.content },
+        ],
+        'failed receipt': [{ ...older, stopReason: 'error' }],
+        'aborted receipt': [{ ...older, stopReason: 'aborted' }],
+      };
+      h.gateway.rpc.mockResolvedValue({ messages: [older, ...tails[kind]] });
+      if (path === 'handleChat') {
+        await h.runtime.handleChat({ ...finalEvent(task), message: { role: 'assistant', content: 'aggregated narration' } });
+      } else {
+        await expect(h.runtime.reconcile(task.id)).rejects.toThrow('未重新派单');
+      }
+      const snapshot = await h.service.snapshot();
+      expect(snapshot.tasks[0].status).toBe(path === 'handleChat' ? 'failed' : 'running');
+      expect(snapshot.tasks[0].result).toBeUndefined();
+      expect(snapshot.audit.filter((item) => item.action === 'result.returned')).toHaveLength(0);
+      expect(h.gateway.rpc.mock.calls.filter(([method]) => method === 'chat.send')).toHaveLength(1);
+    });
+  });
+
   it('does not consume a tool-use final even when text resembles a complete envelope', async () => {
     const h = await harness();
     const task = await h.runtime.dispatch((await queued(h.service)).id);

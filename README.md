@@ -118,6 +118,8 @@ A separately verified native Codex CLI adapter can execute scoped technical code
 
 Public on-site verification and remaining connection gaps: [TASK-011 verification](docs/hotel-operations/task-011-verification.md). Private cloud connection preparation: [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md). Gateway final text may contain narration before tool calls; strict result validation checks the exact attempt's terminal history before accepting a receipt. Gateway history accepts bare JSON or one complete terminal json code block with optional preceding narration; extra blocks, trailing text, tool content and mismatched attempt IDs are rejected. Native Codex receipts remain strict.
 
+Independent review instructions distinguish missing target deliverables from an incomplete review: a completed review can return a deficient target, while a reviewer unable to verify required evidence reports blocked. Existing gaps remain acceptance blockers. See the [review protocol](docs/hotel-operations/protocol.md); successful model calls do not establish successful independent acceptance.
+
 ### 📡 Multi-Channel Management
 Configure and monitor multiple AI channels simultaneously. Each channel operates independently, allowing you to run specialized agents for different tasks.
 Each channel now supports multiple accounts, per-account agent binding, and switching the channel default account directly from the Channels page.
