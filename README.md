@@ -104,6 +104,8 @@ Each agent can also override its own `provider/model` runtime setting; agents wi
 
 ### 🏨 Hotel Command Center
 
+The target operating model is **ChatGPT for strategy and overall coordination, ClawX for management and execution, and Codex for technical development**. Direct Codex business pilots are temporary. The current priority is connecting and validating the system task flow; see the [architecture and integration work order](docs/hotel-operations/system-architecture.md).
+
 This branch adds **Hotel Command Center** (`/hotel`) for role bindings to existing agents, persistent tasks and dependencies, Gateway dispatch, structured result review, versioned business approvals, source-backed daily metrics, shared knowledge, schedules, and multiple properties. A separately scoped local MCP bridge supports compatible clients without giving them owner approval privileges.
 
 Live PMS/channel accounts, the Codex execution environment, and remote ChatGPT connectivity still require on-site integration. A role prompt is not a read-only sandbox; task dispatch checks the actual tool policy. Production price changes, payments, refunds, and publishing remain unavailable until a controlled adapter is connected. Douyin content below 80 points cannot be recorded as published; this workflow only records manual publication.

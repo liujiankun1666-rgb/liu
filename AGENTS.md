@@ -1,5 +1,13 @@
 # AGENTS.md
 
+## Hotel system architecture and current priority
+
+- The user-confirmed architecture is ChatGPT for strategy and overall coordination, ClawX/OpenClaw for task management and business execution, and Codex for technical development, repairs, and validation. Read `docs/hotel-operations/system-architecture.md` before advancing this project.
+- Direct Codex hotel tasks were temporary pilots. Preserve their results and existing configurations; do not silently turn Codex into the permanent hotel manager when a model or connection fails.
+- The current priority is diagnosing integration blockers and connecting the system task flow. Distinguish model-provider authentication, OpenClaw agents, existing Codex chats, and the actual Codex technical executor.
+- A real end-to-end result requires ChatGPT to issue a task and read its result through the connected management layer. Manual copying, local mocks, and successful business pilots validate only their respective parts.
+- Keep the complete feature scope and approval boundaries. Operational data, credentials, and private on-site evidence stay outside this public repository.
+
 ## Cursor Cloud specific instructions
 
 ### Overview
