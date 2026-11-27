@@ -110,6 +110,8 @@ The target operating model is **ChatGPT for strategy and overall coordination, C
 
 This branch adds **Hotel Command Center** (`/hotel`) for role bindings to existing agents, persistent tasks and dependencies, Gateway dispatch, structured result review, versioned business approvals, source-backed daily metrics, shared knowledge, schedules, and multiple properties. A separately scoped local MCP bridge supports compatible clients without giving them owner approval privileges.
 
+The default **supervisor workbench** accepts one goal or a ChatGPT batch brief, creates a supervisor analysis task, and queues it through the existing task system. It shows all eight role bindings, discovered executors/models, knowledge and schedule counts, and review/blocker queues. The six existing sections remain available. Delivery now focuses on the reusable system; prior Ctrip pilots remain evidence rather than the main workstream. Binding an agent does not establish live platform access.
+
 Live PMS/channel accounts, the Codex execution environment, and remote ChatGPT connectivity still require on-site integration. A role prompt is not a read-only sandbox; task dispatch checks the actual tool policy. Production price changes, payments, refunds, and publishing remain unavailable until a controlled adapter is connected. Douyin content below 80 points cannot be recorded as published; this workflow only records manual publication.
 
 See the [implementation and feature matrix](docs/hotel-operations/README.md), [role instructions](docs/hotel-operations/roles.md), [task/result protocol](docs/hotel-operations/protocol.md), and [integration checklist](docs/hotel-operations/integration.md).

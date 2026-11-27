@@ -33,6 +33,9 @@ beforeEach(() => {
 describe('Hotel operations UI', () => {
   it('shows unavailable business data as pending connection instead of zero', async () => {
     render(<MemoryRouter><Hotel /></MemoryRouter>);
+    expect(await screen.findByRole('tab', { name: '总管工作台' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('tab')).toHaveLength(7);
+    fireEvent.click(screen.getByRole('tab', { name: '经营概览' }));
     expect(await screen.findByText('该日期尚无已验收经营指标')).toBeInTheDocument();
     expect(screen.getAllByText('待接入')).toHaveLength(4);
     expect(screen.queryByText('¥0.00')).not.toBeInTheDocument();
@@ -59,6 +62,31 @@ describe('Hotel operations UI', () => {
     expect(await screen.findByText('暂时无法读取任务中心')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('本机服务不可用');
     expect(screen.queryByText('客房收入')).not.toBeInTheDocument();
+  });
+
+  it('refreshes and opens the persisted supervisor draft when queueing fails', async () => {
+    const snapshot = response();
+    const base = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === '/api/hotel/snapshot') return snapshot;
+      if (path === '/api/hotel/tasks' && init?.method === 'POST') {
+        const input = JSON.parse(String(init.body));
+        const saved = { ...task(), ...input, id: 'saved-goal', status: 'draft', result: undefined } as HotelTask;
+        snapshot.snapshot.tasks = [saved];
+        return { success: true, task: saved };
+      }
+      if (path === '/api/hotel/tasks/saved-goal/queue') return { success: false, error: '队列暂不可用，目标已保存' };
+      return base(path, init);
+    });
+    render(<MemoryRouter><Hotel /></MemoryRouter>);
+    fireEvent.change(await screen.findByLabelText('交给总管的目标'), { target: { value: '整理岗位和资料，形成可审核的工作安排' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交给总管' }));
+    expect(await screen.findByTestId('hotel-task-detail')).toHaveTextContent('整理岗位和资料，形成可审核的工作安排');
+    expect(screen.getByTestId('hotel-task-detail')).toHaveTextContent('草稿');
+    expect(screen.getByRole('alert')).toHaveTextContent('队列暂不可用，目标已保存');
+    expect(screen.getByRole('button', { name: '加入执行队列' })).toBeEnabled();
+    expect(successMock).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([path]) => path === '/api/hotel/tasks')).toHaveLength(1);
   });
 
   it('blocks manual publication below 80 and does not call the backend', async () => {

@@ -16,12 +16,14 @@ import { Overview, type WorkflowKind } from './Overview';
 import { Schedules } from './Schedules';
 import { TaskDetail } from './TaskDetail';
 import { TaskEditor, type ActionRunner } from './TaskEditor';
+import { Workbench } from './Workbench';
 import { Empty, Notice, StatusBadge } from './components';
 import { actionLabels, dateTime, roleLabels } from './helpers';
 import { contentReuseInput } from './content-reuse';
 
-type Tab = 'overview' | 'tasks' | 'bindings' | 'knowledge' | 'schedules' | 'integrations';
+type Tab = 'workbench' | 'overview' | 'tasks' | 'bindings' | 'knowledge' | 'schedules' | 'integrations';
 const tabs: Array<{ id: Tab; label: string }> = [
+  { id: 'workbench', label: '总管工作台' },
   { id: 'overview', label: '经营概览' }, { id: 'tasks', label: '任务与审批' },
   { id: 'bindings', label: '岗位绑定' }, { id: 'knowledge', label: '知识库' },
   { id: 'schedules', label: '定时任务' }, { id: 'integrations', label: '接入与门店' },
@@ -32,7 +34,7 @@ export function Hotel() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('workbench');
   const [propertyId, setPropertyId] = useState('xingcheng-aigong');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ taskId?: string; parentId?: string; template?: HotelTaskTemplate } | null>(null);
@@ -79,6 +81,8 @@ export function Hotel() {
       return true;
     } catch (failure) {
       const message = failure instanceof Error ? failure.message : String(failure);
+      // A task can be saved before a later queue request fails. Keep that draft visible.
+      await refresh();
       setError(message);
       toast.error(message);
       return false;
@@ -123,13 +127,14 @@ export function Hotel() {
   return <div className="mx-auto max-w-[1440px] space-y-5 pb-8" data-testid="hotel-page">
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div className="space-y-2"><div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><h1 className="text-2xl font-semibold tracking-tight" data-testid="hotel-page-title">酒店总管</h1><Badge variant="outline">本机任务中心</Badge></div><p className="text-sm text-muted-foreground">讨论目标、派发工作、核验结果，把每项经营决策留在同一处。</p></div>
-      <div className="flex flex-wrap items-center gap-2">{response && property && <Select aria-label="当前门店" className="w-52" value={property.id} onChange={(event) => switchProperty(event.target.value)}>{response.snapshot.properties.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</Select>}<Button variant="outline" size="icon" disabled={loading || busy} aria-label="刷新酒店数据" onClick={() => void refresh(true)}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></Button></div>
+      <div className="flex flex-wrap items-center gap-2">{response && property && <Select aria-label="当前门店" className="w-52" value={property.id} disabled={busy} onChange={(event) => switchProperty(event.target.value)}>{response.snapshot.properties.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}</Select>}<Button variant="outline" size="icon" disabled={loading || busy} aria-label="刷新酒店数据" onClick={() => void refresh(true)}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /></Button></div>
     </header>
     {error && <Notice error>{error}{response && <p className="mt-1">当前保留上次成功读取的数据，刷新成功后更新。</p>}</Notice>}
     {!response || !property ? loading ? <div className="flex items-center justify-center gap-3 rounded-xl border py-24 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />正在读取本机酒店任务中心…</div> : <Empty title="暂时无法读取任务中心" description="检查本机 ClawX 服务后重试。未连接时不会生成演示经营数据。"><Button onClick={() => void refresh(true)}>重新读取</Button></Empty> : <>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3"><div className="flex flex-wrap items-center gap-3 text-sm"><span className={`h-2 w-2 rounded-full ${response.gateway.state === 'running' ? 'bg-emerald-500' : 'bg-amber-500'}`} /><span>OpenClaw Gateway {response.gateway.state === 'running' ? '已连接' : '待连接'}</span><span className="text-xs text-muted-foreground">上次更新 {dateTime(loadedAt)} · 北京时间</span></div><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => { if (supervisor) { switchSession(supervisor.mainSessionKey || `agent:${supervisor.id}:main`); navigate('/'); } else setTab('bindings'); }}><MessageSquare className="mr-1.5 h-4 w-4" />{supervisor ? '和总管讨论' : '绑定你的总管'}</Button><Button size="sm" onClick={() => { setTab('tasks'); setSelectedTaskId(null); setEditor({}); }} disabled={busy}><Plus className="mr-1.5 h-4 w-4" />新建任务</Button></div></div>
       <div className="overflow-x-auto border-b"><div role="tablist" aria-label="酒店工作区" className="flex min-w-max gap-1">{tabs.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} aria-controls={`hotel-panel-${item.id}`} id={`hotel-tab-${item.id}`} key={item.id} onClick={() => setTab(item.id)} className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors ${tab === item.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{item.label}{item.id === 'tasks' && reviews > 0 && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-900 dark:bg-amber-950 dark:text-amber-200">{reviews}</span>}</button>)}</div></div>
       <div role="tabpanel" id={`hotel-panel-${tab}`} aria-labelledby={`hotel-tab-${tab}`} key={`${property.id}-${tab}`}>
+        {tab === 'workbench' && <Workbench property={property} response={response} busy={busy} run={run} onTask={selectTask} onNavigate={(next) => { setSelectedTaskId(null); setEditor(null); setTab(next); }} />}
         {tab === 'overview' && <Overview property={property} response={response} busy={busy} onTask={selectTask} onWorkflow={(kind) => void createWorkflow(kind)} onBindings={() => setTab('bindings')} />}
         {tab === 'tasks' && (editor?.taskId && !editingTask ? <Notice>任务已保存，暂未读到最新记录。请先刷新酒店数据，再继续编辑。</Notice> : editor ? <TaskEditor key={editingTask ? `${editingTask.id}-${editingTask.planVersion}` : editor.parentId ?? editor.template?.id ?? 'new'} propertyId={property.id} tasks={tasks} knowledge={knowledge} templates={response.templates} task={editingTask} initialTemplate={editor.template} initialParentId={editor.parentId} busy={busy} run={run} onClose={() => setEditor(null)} onCreated={selectTask} /> : selectedTask ? <TaskDetail key={selectedTask.id} task={selectedTask} tasks={tasks} busy={busy} run={run} onClose={() => setSelectedTaskId(null)} onEdit={() => setEditor({ taskId: selectedTask.id })} onChild={() => setEditor({ parentId: selectedTask.id })} onSelect={selectTask} onReuse={() => void reuseContent(selectedTask)} /> : <TaskList tasks={tasks} templates={response.templates} busy={busy} onTask={selectTask} onTemplate={(template) => setEditor({ template })} onRun={() => void run('已检查当前门店待执行任务', () => hotelApi.runReady(property.id))} />)}
         {tab === 'bindings' && <Bindings propertyId={property.id} bindings={response.snapshot.bindings} agents={response.agents} busy={busy} run={run} />}

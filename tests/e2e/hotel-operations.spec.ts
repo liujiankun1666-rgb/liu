@@ -1,9 +1,64 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { CALLBACK_RECEIVED_HTML } from '../../electron/utils/openai-codex-oauth';
+import type { HotelSnapshot } from '../../shared/hotel';
 import { closeElectronApp, expect, getStableWindow, test } from './fixtures/electron';
 
 // These tests use the real Host API and isolated Electron user-data directory.
 // No production Gateway, hotel account, or fabricated success response is used.
 test.describe('Hotel operations command center', () => {
+  test('opens the complete workbench and queues a natural-language goal without claiming execution', async ({ launchElectronApp, userDataDir }, testInfo) => {
+    const app = await launchElectronApp({ skipSetup: true });
+    try {
+      const page = await getStableWindow(app);
+      await page.getByTestId('sidebar-nav-hotel').click();
+      await expect(page.getByRole('tab', { name: '总管工作台', exact: true })).toHaveAttribute('aria-selected', 'true');
+      const workbench = page.getByTestId('hotel-workbench');
+      await expect(workbench).toBeVisible();
+      for (const name of ['经营概览', '任务与审批', '岗位绑定', '知识库', '定时任务', '接入与门店']) {
+        await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
+      }
+      const roles = {
+        supervisor: 'AI 总管', pms: '别样红运营', revenue: '收益与竞对', ctrip: '携程运营',
+        douyin: '抖音创作', finance: '财务分析', service: '客户服务', codex: 'Codex 技术支持',
+      };
+      for (const [role, label] of Object.entries(roles)) {
+        const card = workbench.getByTestId(`hotel-role-${role}`);
+        await expect(card.getByRole('heading', { name: label, exact: true })).toBeVisible();
+        await expect(card.getByText('待绑定', { exact: true })).toBeVisible();
+      }
+      await expect(page.getByText('该日期尚无已验收经营指标')).toHaveCount(0);
+      const submit = workbench.getByRole('button', { name: '提交给总管', exact: true });
+      await expect(submit).toBeDisabled();
+      await page.screenshot({ path: testInfo.outputPath('hotel-workbench.png'), fullPage: true });
+
+      const objective = '整理酒店管理体系的岗位职责、资料来源和验收清单，仅使用本次合成测试资料。';
+      await workbench.getByLabel('交给总管的目标', { exact: true }).fill(objective);
+      await submit.click();
+      const detail = page.getByTestId('hotel-task-detail');
+      await expect(detail).toBeVisible();
+      await expect(detail.getByText(objective, { exact: true })).toBeVisible();
+      await expect(detail.getByText('待执行', { exact: true })).toBeVisible();
+
+      // Inspect the persisted result of the real UI → Host API flow. With no
+      // Gateway or role binding in this fixture, queueing must not fabricate a run.
+      const snapshot = JSON.parse(await readFile(join(userDataDir, 'hotel-command-center.json'), 'utf8')) as HotelSnapshot;
+      expect(snapshot.tasks).toHaveLength(1);
+      const created = snapshot.tasks[0];
+      expect(created).toMatchObject({ objective, role: 'supervisor', action: 'analysis', status: 'queued', attempts: [] });
+      expect(created.result).toBeUndefined();
+      expect(created.approval).toBeUndefined();
+      expect(snapshot.audit.some((entry) => entry.taskId === created.id && entry.action === 'task.queued')).toBe(true);
+
+      await page.reload();
+      await expect(page.getByTestId('hotel-workbench')).toBeVisible();
+      await page.getByRole('tab', { name: '任务与审批', exact: true }).click();
+      await page.getByRole('button', { name: created.title, exact: true }).click();
+      await expect(page.getByTestId('hotel-task-detail').getByText(objective, { exact: true })).toBeVisible();
+      await expect(page.getByTestId('hotel-task-detail').getByText('待执行', { exact: true })).toBeVisible();
+    } finally { await closeElectronApp(app); }
+  });
+
   test('persists a hotel task and knowledge while showing missing metrics honestly', async ({ launchElectronApp }, testInfo) => {
     const app = await launchElectronApp({ skipSetup: true });
     try {
@@ -11,6 +66,7 @@ test.describe('Hotel operations command center', () => {
       await page.getByTestId('sidebar-nav-hotel').click();
       await expect(page.getByTestId('hotel-page-title')).toHaveText('酒店总管');
       await expect(page.getByText(/OpenClaw Gateway/)).toBeVisible();
+      await page.getByRole('tab', { name: '经营概览', exact: true }).click();
       await expect(page.getByText('该日期尚无已验收经营指标')).toBeVisible();
       await expect(page.getByText('待接入', { exact: true })).toHaveCount(4);
 
