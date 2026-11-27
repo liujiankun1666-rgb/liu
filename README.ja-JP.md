@@ -116,7 +116,7 @@ PMS・販売チャネルのアカウント、Codex の実行環境、リモー�
 
 独立した Codex CLI アダプターは Gateway を起動せず、制限付き技術タスクを実行できます。各実行の権限を検証し、結果は独立した確認待ちになります。[技術実行アダプター](docs/hotel-operations/native-codex.md)を参照してください。ローカル検証だけではクラウド ChatGPT 接続の証明になりません。
 
-現地検証の匿名化サマリーと未接続項目は [TASK-011 検証](docs/hotel-operations/task-011-verification.md)、正式なプライベート接続の準備は [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md) を参照してください。
+現地検証の匿名化サマリーと未接続項目は [TASK-011 検証](docs/hotel-operations/task-011-verification.md)、正式なプライベート接続の準備は [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md) を参照してください。Gateway の最終テキストにツール呼び出し前の説明が混在する場合、厳密な結果検証を維持し、同じ実行の最後のアシスタント応答を履歴から確認します。Gateway 履歴は JSON 単体または末尾の唯一の完全な json コードブロックだけを受け付け、複数ブロック・後続文・ツール出力・実行ID不一致を拒否します。Codex の厳密な形式は変更しません。
 
 ### 📡 マルチチャネル管理
 複数のAIチャネルを同時に設定・監視できます。各チャネルは独立して動作するため、異なるタスクに特化したエージェントを実行できます。

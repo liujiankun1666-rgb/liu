@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger';
 import type { HotelTask, HotelTaskResult, HotelSnapshotResponse, HotelCapability } from '../../../shared/hotel';
 import { HotelDomainError, HOTEL_TASK_TEMPLATES, type HotelService } from './domain';
 import { getHotelService } from './store';
-import { asRecord, assistantText, buildHotelBrief, parseHotelResult } from './gateway-payload';
+import { asRecord, assistantText, buildHotelBrief, gatewayHistoryResultText, parseHotelResult } from './gateway-payload';
 import { inspectHotelExecutionPolicy } from './execution-policy';
 import { CODEX_TECHNICAL_ID, CodexCliExecutor, type CodexTechnicalExecutor } from './codex-cli';
 
@@ -206,6 +206,7 @@ export class HotelRuntime {
     const event = asRecord(payload);
     if (!event || typeof event.sessionKey !== 'string' || typeof event.runId !== 'string') return;
     if (!['final', 'error', 'aborted'].includes(String(event.state))) return;
+    if (event.state === 'final' && ['toolUse', 'tool_use', 'tool_calls'].includes(String(event.stopReason))) return;
     const snapshot = await this.service.snapshot();
     const task = snapshot.tasks.find((item) => {
       const attempt = item.attempts.at(-1);
@@ -222,8 +223,30 @@ export class HotelRuntime {
       this.onChange();
       return;
     }
-    const text = assistantText(event.message);
+    let text = assistantText(event.message);
     if (!text) return;
+    try { parseHotelResult(text, task.id, attempt.id); }
+    catch {
+      // Gateway final text can aggregate the narration before a tool call with
+      // the terminal answer. Keep the envelope parser strict: only the last
+      // eligible assistant turn from this exact attempt's history may replace it.
+      let history: { messages?: unknown[] };
+      try {
+        history = await this.gateway.rpc('chat.history', { sessionKey: attempt.sessionKey, limit: 50 }, 20000);
+      } catch {
+        // An unreadable history is not proof that the completed run failed.
+        // Keep it reconcilable without issuing another chat.send.
+        await this.service.failTask(task.id, attempt.id, '最终回传需核对原会话，但历史读取失败；请核对同一执行批次，不要重复派发。', true);
+        this.onChange();
+        return;
+      }
+      const entries = Array.isArray(history?.messages) ? history.messages : [];
+      const last = [...entries].reverse().map(assistantText).find(Boolean);
+      if (last) {
+        try { text = gatewayHistoryResultText(last, task.id, attempt.id); }
+        catch { /* Reject mismatched or malformed terminal answers; never scan older results. */ }
+      }
+    }
     await this.consumeResult(task, text, event.runId);
   }
 
@@ -295,10 +318,11 @@ export class HotelRuntime {
     }
     const history = await this.gateway.rpc<{ messages?: unknown[] }>('chat.history', { sessionKey: attempt.sessionKey, limit: 50 }, 20000);
     const entries = Array.isArray(history?.messages) ? history.messages : [];
-    for (const entry of [...entries].reverse()) {
-      const text = assistantText(entry);
-      if (!text) continue;
-      try { parseHotelResult(text, task.id, attempt.id); } catch { continue; }
+    const last = [...entries].reverse().map(assistantText).find(Boolean);
+    if (last) {
+      let text: string;
+      try { text = gatewayHistoryResultText(last, task.id, attempt.id); }
+      catch { throw new Error('最后助手回传没有本次执行的有效协议帧；未重新派单，请检查原会话'); }
       await this.consumeResult(task, text, attempt.runId);
       return (await this.service.snapshot()).tasks.find((item) => item.id === taskId)!;
     }

@@ -116,7 +116,7 @@ Local controlled onboarding uses an explicit separate user-data directory and di
 
 A separately verified native Codex CLI adapter can execute scoped technical code tasks without Gateway. It preserves workspace/network boundaries and returns results for independent review; see [native technical executor](docs/hotel-operations/native-codex.md). Local success does not establish a cloud ChatGPT connection.
 
-Public on-site verification and remaining connection gaps: [TASK-011 verification](docs/hotel-operations/task-011-verification.md). Private cloud connection preparation: [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md).
+Public on-site verification and remaining connection gaps: [TASK-011 verification](docs/hotel-operations/task-011-verification.md). Private cloud connection preparation: [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md). Gateway final text may contain narration before tool calls; strict result validation checks the exact attempt's terminal history before accepting a receipt. Gateway history accepts bare JSON or one complete terminal json code block with optional preceding narration; extra blocks, trailing text, tool content and mismatched attempt IDs are rejected. Native Codex receipts remain strict.
 
 ### 📡 Multi-Channel Management
 Configure and monitor multiple AI channels simultaneously. Each channel operates independently, allowing you to run specialized agents for different tasks.

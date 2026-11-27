@@ -20,6 +20,7 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
 export function assistantText(message: unknown): string {
   const record = asRecord(message);
   if (!record || record.role !== 'assistant') return '';
+  if (['toolUse', 'tool_use', 'tool_calls'].includes(String(record.stopReason))) return '';
   if (typeof record.content === 'string') return record.content.slice(0, 262144);
   if (!Array.isArray(record.content)) return '';
   if (record.content.some((part) => ['tool_use', 'toolCall'].includes(String(asRecord(part)?.type)))) return '';
@@ -46,6 +47,21 @@ export function parseHotelResult(text: string, taskId: string, attemptId: string
     throw new Error('阻塞或失败回传必须包含 error 原因');
   }
   return parsed as unknown as HotelResultEnvelope;
+}
+
+/** Gateway history may include narration before one explicit terminal protocol frame.
+ * This is not a general JSON scanner and must never be used for tool messages or
+ * the native Codex receipt path. IDs and result evidence remain strictly checked.
+ */
+export function gatewayHistoryResultText(text: string, taskId: string, attemptId: string): string {
+  const trimmed = text.trim();
+  const fences = trimmed.match(/```/g) ?? [];
+  if (!fences.length) { parseHotelResult(trimmed, taskId, attemptId); return trimmed; }
+  if (fences.length !== 2) throw new Error('Gateway 回传必须只有一个完整协议代码块');
+  const framed = /^[\s\S]*?```json[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(trimmed);
+  if (!framed) throw new Error('Gateway 回传需要末尾完整 json 代码块，块后不得有文字');
+  parseHotelResult(framed[1], taskId, attemptId);
+  return framed[1];
 }
 
 /** The brief is an instruction, not a substitute for the runtime's actual tool permissions. */

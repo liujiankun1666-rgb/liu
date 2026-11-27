@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HotelService } from '../../electron/services/hotel/domain';
 import { MemoryHotelStore } from '../../electron/services/hotel/store';
 import { HotelRuntime } from '../../electron/services/hotel/runtime';
-import { assistantText, parseHotelResult } from '../../electron/services/hotel/gateway-payload';
+import { assistantText, gatewayHistoryResultText, parseHotelResult } from '../../electron/services/hotel/gateway-payload';
 import { createHotelWorkflow } from '../../electron/services/hotel/workflows';
 import type { HotelTask, HotelTaskResult } from '../../shared/hotel';
 
@@ -108,6 +108,80 @@ describe('hotel Gateway orchestration', () => {
     expect(restored.status).toBe('needs_review');
     expect(rpc.mock.calls.filter((call) => call[0] === 'chat.send')).toHaveLength(1);
     expect(rpc.mock.calls.at(-1)?.[0]).toBe('chat.history');
+  });
+
+  it('recovers aggregated final narration from the exact attempt history and deduplicates repeats', async () => {
+    const h = await harness();
+    const task = await h.runtime.dispatch((await queued(h.service)).id);
+    const terminal = finalEvent(task).message;
+    h.gateway.rpc.mockResolvedValue({ messages: [
+      { role: 'assistant', content: [{ type: 'text', text: "I'll read first" }, { type: 'toolCall', name: 'read' }] },
+      { role: 'toolResult', content: 'untrusted tool text' }, terminal,
+    ] });
+    const event = { ...finalEvent(task), message: { role: 'assistant', content: `I'll read first\n${terminal.content}` } };
+    await h.runtime.handleChat(event);
+    await h.runtime.handleChat(event);
+    expect((await h.service.snapshot()).tasks[0].status).toBe('needs_review');
+    expect(h.gateway.rpc.mock.calls.filter(([method]) => method === 'chat.history')).toEqual([
+      ['chat.history', { sessionKey: task.attempts[0].sessionKey, limit: 50 }, 20000],
+    ]);
+    expect((await h.service.snapshot()).audit.filter((item) => item.action === 'result.returned')).toHaveLength(1);
+  });
+
+  it.each(['wrong-attempt', 'plain-text', 'tool-only'])('rejects aggregated finals with %s history', async (kind) => {
+    const h = await harness();
+    const task = await h.runtime.dispatch((await queued(h.service)).id);
+    const other = { ...JSON.parse(finalEvent(task).message.content), attemptId: 'another-attempt' };
+    const messages = kind === 'wrong-attempt'
+      ? [finalEvent(task).message, { role: 'assistant', content: JSON.stringify(other) }]
+      : kind === 'plain-text' ? [{ role: 'assistant', content: 'all done' }]
+        : [{ role: 'assistant', stopReason: 'toolUse', content: finalEvent(task).message.content }, { role: 'toolResult', content: finalEvent(task).message.content }];
+    h.gateway.rpc.mockResolvedValue({ messages });
+    await h.runtime.handleChat({ ...finalEvent(task), message: { role: 'assistant', content: 'prefix that is not a receipt' } });
+    expect((await h.service.snapshot()).tasks[0].status).toBe('failed');
+    expect((await h.service.snapshot()).tasks[0].result).toBeUndefined();
+  });
+
+  it('keeps an unreadable final history uncertain without redispatching', async () => {
+    const h = await harness();
+    const task = await h.runtime.dispatch((await queued(h.service)).id);
+    h.gateway.rpc.mockRejectedValue(new Error('history unavailable'));
+    await h.runtime.handleChat({ ...finalEvent(task), message: { role: 'assistant', content: 'aggregated narration' } });
+    const stored = (await h.service.snapshot()).tasks[0];
+    expect(stored.status).toBe('blocked');
+    expect(stored.attempts[0].outcome).toBe('uncertain');
+    expect(h.gateway.rpc.mock.calls.filter(([method]) => method === 'chat.send')).toHaveLength(1);
+  });
+
+  it('accepts one terminal json frame only from the exact last assistant history turn', async () => {
+    const h = await harness();
+    const task = await h.runtime.dispatch((await queued(h.service)).id);
+    h.gateway.rpc.mockResolvedValue({ messages: [
+      { role: 'toolResult', content: 'not a receipt' },
+      { role: 'assistant', stopReason: 'stop', content: `Explanation\n\n\`\`\`json\n${finalEvent(task).message.content}\n\`\`\`` },
+    ] });
+    await h.runtime.handleChat({ ...finalEvent(task), message: { role: 'assistant', content: 'aggregated output' } });
+    expect((await h.service.snapshot()).tasks[0].status).toBe('needs_review');
+  });
+
+  it('reconciles a terminal framed answer without scanning past a later invalid assistant', async () => {
+    const h = await harness();
+    const task = await h.runtime.dispatch((await queued(h.service)).id);
+    const framed = { role: 'assistant', content: `Explanation\n\`\`\`json\n${finalEvent(task).message.content}\n\`\`\`` };
+    h.gateway.rpc.mockResolvedValue({ messages: [framed, { role: 'assistant', content: 'later invalid answer' }] });
+    await expect(h.runtime.reconcile(task.id)).rejects.toThrow('最后助手');
+    expect((await h.service.snapshot()).tasks[0].status).toBe('running');
+    h.gateway.rpc.mockResolvedValue({ messages: [framed] });
+    expect((await h.runtime.reconcile(task.id)).status).toBe('needs_review');
+    expect(h.gateway.rpc.mock.calls.filter(([method]) => method === 'chat.send')).toHaveLength(1);
+  });
+
+  it('does not consume a tool-use final even when text resembles a complete envelope', async () => {
+    const h = await harness();
+    const task = await h.runtime.dispatch((await queued(h.service)).id);
+    await h.runtime.handleChat({ ...finalEvent(task), stopReason: 'toolUse' });
+    expect((await h.service.snapshot()).tasks[0].status).toBe('running');
+    expect(h.gateway.rpc.mock.calls.filter(([method]) => method === 'chat.history')).toHaveLength(0);
   });
 
   it('recovers a restart without silently sending queued duplicate work', async () => {
@@ -239,4 +313,27 @@ it('rejects reserved native identity collisions instead of switching an OpenClaw
   expect((await runtime.inspectExecutionPolicy('codex-cli-technical', 'code', 'xingcheng-aigong')).allowed).toBe(false);
   expect(inspect).not.toHaveBeenCalled();
   await expect(runtime.inspectExecutionPolicy('codex-cli-technical', 'analysis', 'xingcheng-aigong')).rejects.toThrow('action=code');
+});
+
+describe('Gateway terminal history protocol frame', () => {
+  const envelope = JSON.stringify({ taskId: 'task', attemptId: 'attempt', outcome: 'completed', result: evidence });
+  const frame = '```json\n' + envelope + '\n```';
+  it.each([['bare', envelope], ['framed', frame], ['narration', 'Read completed.\n' + frame]])('accepts %s terminal protocol', (_kind, text) => {
+    expect(gatewayHistoryResultText(text, 'task', 'attempt')).toBe(envelope);
+  });
+  it.each([
+    ['multiple frames', frame + '\n' + frame],
+    ['another language frame', '```text\nnotes\n```\n' + frame],
+    ['trailing prose', frame + '\nAll done'],
+    ['truncated fence', frame.slice(0, -3)],
+    ['truncated json', '```json\n' + envelope.slice(0, -1) + '\n```'],
+    ['unlabelled fence', '```\n' + envelope + '\n```'],
+    ['arbitrary brace scan', 'Here is a result: ' + envelope],
+    ['wrong attempt', frame.replace('"attemptId":"attempt"', '"attemptId":"other"')],
+  ])('rejects %s without loosening the native parser', (_kind, text) => {
+    expect(() => gatewayHistoryResultText(text, 'task', 'attempt')).toThrow();
+  });
+  it('leaves the existing parser strict for native receipts', () => {
+    expect(() => parseHotelResult('Narration\n' + frame, 'task', 'attempt')).toThrow();
+  });
 });

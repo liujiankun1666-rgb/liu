@@ -117,7 +117,7 @@ ClawX 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 
 新增独立原生 Codex CLI 技术适配器，可在不启动 Gateway 时执行受限技术 code 任务；逐次核验工作区/网络边界，结果先待独立验收。详见[原生技术执行端](docs/hotel-operations/native-codex.md)。本机子链不等于云端 ChatGPT 已接通。
 
-现场脱敏验证与未接通部分见 [TASK-011 验证摘要](docs/hotel-operations/task-011-verification.md)；正式私有连接准备见 [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md)。
+现场脱敏验证与未接通部分见 [TASK-011 验证摘要](docs/hotel-operations/task-011-verification.md)；正式私有连接准备见 [Secure MCP Tunnel](docs/hotel-operations/secure-mcp-tunnel.md)。Gateway 最终文本可能包含工具调用前的说明；管理层保持严格回传校验，并核对同一执行批次的最后助手回传，不把工具输出或其他批次结果当完成。Gateway 历史只接受裸JSON或末尾唯一完整json代码块（可有前序说明）；拒绝多块、块后文字、工具内容和错批次。原生Codex回传仍按原严格格式。
 
 ### 📡 多频道管理
 同时配置和监控多个 AI 频道。每个频道独立运行，允许你为不同任务运行专门的智能体。
