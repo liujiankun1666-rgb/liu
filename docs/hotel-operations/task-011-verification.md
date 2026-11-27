@@ -110,3 +110,14 @@ NODE_OPTIONS=--no-experimental-webstorage node node_modules/vitest/vitest.mjs ru
 TypeScript、Vite构建、diff检查通过；针对性53项通过。4个不同Electron E2E用例分两轮通过：首次新增OAuth用例动态TypeScript import失败，改静态import后重跑该项通过；未把E2E合成夹具当真实模型证明。comms replay/compare通过，未刷新baseline。此次分类接续只改公开文档和链接，不改运行时/测试逻辑、既有应用状态或排期。
 
 技术方法入口：[原生技术执行端](native-codex.md)。正式云端连接准备：[Secure MCP Tunnel](secure-mcp-tunnel.md)，复用现有stdio桥接；当前无账户侧成功证据，不能称已接通。下一步仍是正式连接及服务端独立验收，保持needs_review，不扩大业务写入。
+
+## 后续独立代码复核与修正
+
+在 `dbac315` 同步后，独立代码复核发现并修正两项问题：
+
+- 原生执行器向子进程写入提示词时，子进程提前退出可能触发未处理的 stdin 管道错误。修复为监听输入流错误，沿用有界终止流程并等待真实 close 后再报告失败；不把输入未送达当成执行成功。使用真实 Node 早退子进程和超过管道缓冲的输入完成回归，原生执行器测试文件 6/6 通过。
+- 本地报表交接测试的初版夹具沿用了真实经营统计，改为明确合成的历史日期和计数，并保留原断言强度；该测试文件 4/4 通过。普通后续提交只修正当前版本，`dbac315` 历史中的原夹具仍可追溯，本次未强推或改写历史，也不声称历史已清除。
+
+本轮没有调用真实模型、读取经营后台、修改本机账号或改变 `needs_review` 状态。上文 535 项全量结果对应修正前技术提交的已记录验证，不能作为本次修正提交的新全量结果。
+
+本轮补充的项目 TypeScript 检查、通信 replay/compare 和 diff 检查通过；原生执行器修改文件的 ESLint 通过。没有修改通信 baseline，也没有重新声明完整系统或模型认证已通过。

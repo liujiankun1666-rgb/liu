@@ -50,3 +50,16 @@ it('bounds an uncooperative owned process with TERM then KILL instead of hanging
   expect(Date.now() - started).toBeLessThan(2500);
   expect(CODEX_EXECUTION_TIMEOUT_MS).toBe(600000);
 });
+
+it('handles an early child exit while a large prompt is still being written', async () => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'hotel-stdin-test-'))); roots.push(root);
+  let closed = false;
+  const result = runNativeCommand(process.execPath, ['-e', 'process.exit(0)'], {
+    cwd: root,
+    input: 'x'.repeat(1024 * 1024),
+    timeout: 10000,
+    onChild: (child) => child.once('close', () => { closed = true; }),
+  });
+  await expect(result).rejects.toThrow('Native child stdin failed before input delivery completed');
+  expect(closed).toBe(true);
+}, 15000);

@@ -18,8 +18,8 @@ function fixture() {
     hotel_id: 'test-hotel', channel: '携程', source_path: source,
     source_sha256: hash(readFileSync(source)),
     scope: { date_basis: 'period', funnel_device_filter: 'APP', entry_filter: '来自列表页', units: 'UV' },
-    previous: { query_start: '2026-11-13', query_end: '2026-11-19', observed_at: '2026-11-27T08:00:00+08:00', form_uv: 10, submit_users: 7 },
-    current: { query_start: '2026-11-20', query_end: '2026-11-26', observed_at: '2026-11-27T08:00:00+08:00', form_uv: 12, submit_users: 4 },
+    previous: { query_start: '2024-02-02', query_end: '2024-02-08', observed_at: '2024-02-16T09:30:00+08:00', form_uv: 37, submit_users: 19 },
+    current: { query_start: '2024-02-09', query_end: '2024-02-15', observed_at: '2024-02-16T09:30:00+08:00', form_uv: 44, submit_users: 23 },
   };
   const inputPath = join(root, 'input.json');
   function run(basename?: string, digest?: string) {
@@ -39,11 +39,11 @@ describe('local report handoff boundaries', () => {
     expect(f.run().status).toBe(0);
     const old = readFileSync(join(f.workspace, 'ctrip-funnel.json'));
     expect(f.run().status).toBe(0);
-    f.input.current.submit_users = 5;
+    f.input.current.submit_users = 24;
     expect(f.run().status).not.toBe(0);
     expect(readFileSync(join(f.workspace, 'ctrip-funnel.json')).equals(old)).toBe(true);
-    expect(f.run('ctrip-funnel-20261128-task010').status).toBe(0);
-    const manifest = JSON.parse(readFileSync(join(f.workspace, 'ctrip-funnel-20261128-task010.manifest.json'), 'utf8'));
+    expect(f.run('ctrip-funnel-20240217-synthetic').status).toBe(0);
+    const manifest = JSON.parse(readFileSync(join(f.workspace, 'ctrip-funnel-20240217-synthetic.manifest.json'), 'utf8'));
     expect(manifest.sourceCodexThreadId).toBe('test-codex-thread');
     expect(manifest.openclawAgentId).toBe('test-openclaw-agent');
     expect(manifest.bidirectionalChatControl).toBe(false);
@@ -62,7 +62,7 @@ describe('local report handoff boundaries', () => {
     expect(f.run('../outside').status).not.toBe(0);
     f.input.current.form_uv = Number.NaN;
     expect(f.run().status).not.toBe(0);
-    f.input.current.form_uv = 12;
+    f.input.current.form_uv = 44;
     writeFileSync(f.source, '{"changed":true}');
     expect(f.run().status).not.toBe(0);
   });

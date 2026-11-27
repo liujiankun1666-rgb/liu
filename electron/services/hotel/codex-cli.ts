@@ -61,10 +61,12 @@ export async function runNativeCommand(executable: string, args: string[], optio
   return new Promise<{ code: number | null; stdout: string; stderr: string; pid?: number; signal: string | null; timedOut: boolean }>((resolveRun, reject) => {
     const child = spawn(executable, args, { cwd: options.cwd, env: cleanEnvironment(), stdio: ['pipe', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
     options.onChild?.(child);
-    let stdout = '', stderr = '', overflow = false, timedOut = false;
+    let stdout = '', stderr = '', overflow = false, timedOut = false, closed = false;
+    let stdinError: Error | undefined;
     let forceTimer: ReturnType<typeof setTimeout> | undefined;
     let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
     const stop = () => {
+      if (closed) return;
       signalOwnedProcess(child, 'SIGTERM');
       forceTimer ??= setTimeout(() => signalOwnedProcess(child, 'SIGKILL'), options.terminationGraceMs ?? 2000);
       deadlineTimer ??= setTimeout(() => { clearTimeout(timer); reject(new Error('Native child exit remains unconfirmed after bounded termination; reconcile before retry')); }, (options.terminationGraceMs ?? 2000) + 3000);
@@ -73,8 +75,17 @@ export async function runNativeCommand(executable: string, args: string[], optio
     const clear = () => { clearTimeout(timer); if (forceTimer) clearTimeout(forceTimer); if (deadlineTimer) clearTimeout(deadlineTimer); };
     child.stdout!.on('data', (value) => { stdout += value; if (stdout.length > LIMIT) { overflow = true; stop(); } });
     child.stderr!.on('data', (value) => { stderr += value; if (stderr.length > LIMIT) { overflow = true; stop(); } });
+    // A child can reject configuration/authentication before consuming its prompt.
+    // Handle the pipe's own error event, then retain ownership until close (or the
+    // existing bounded termination deadline), rather than crashing the host.
+    child.stdin!.on('error', (error) => { stdinError ??= error; stop(); });
     child.on('error', (error) => { clear(); reject(error); });
-    child.on('close', (code, signal) => { clear(); if (overflow) reject(new Error('Codex output exceeded the bounded receipt limit')); else resolveRun({ code, stdout, stderr, pid: child.pid, signal, timedOut }); });
+    child.on('close', (code, signal) => {
+      closed = true; clear();
+      if (overflow) reject(new Error('Codex output exceeded the bounded receipt limit'));
+      else if (stdinError) reject(new Error(`Native child stdin failed before input delivery completed: ${stdinError.message}`));
+      else resolveRun({ code, stdout, stderr, pid: child.pid, signal, timedOut });
+    });
     child.stdin!.end(options.input ?? '');
   });
 }
