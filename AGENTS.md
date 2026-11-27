@@ -4,8 +4,10 @@
 
 - The user-confirmed architecture is ChatGPT for strategy and overall coordination, ClawX/OpenClaw for task management and business execution, and Codex for technical development, repairs, and validation. Read `docs/hotel-operations/system-architecture.md` before advancing this project.
 - Direct Codex hotel tasks were temporary pilots. Preserve their results and existing configurations; do not silently turn Codex into the permanent hotel manager when a model or connection fails.
-- The current priority is diagnosing integration blockers and connecting the system task flow. Distinguish model-provider authentication, OpenClaw agents, existing Codex chats, and the actual Codex technical executor.
-- A real end-to-end result requires ChatGPT to issue a task and read its result through the connected management layer. Manual copying, local mocks, and successful business pilots validate only their respective parts.
+- Latest user correction (2026-11-27): stop making the cloud connection a prerequisite for using the system. Pause Platform/Secure MCP Tunnel onboarding; do not ask the user to log in again, attach a browser tab, obtain tunnel access, or build another gateway merely to complete this route. Resume that optional work only if the user asks for it.
+- The current priority is usable local operation through the existing ClawX hotel task center and working DeepSeek configuration. ChatGPT provides strategy and batch briefs; ClawX manages execution and review; Codex handles technical delivery. Read `docs/hotel-operations/local-first.md`. Preserve the complete feature scope, existing edits, identities, results, and approval boundaries.
+- Batch handoff may be manual for now: one brief in and one summary out, rather than one relay per worker. Report this honestly as local operation with manual handoff, not a live cloud connection. Future automated transport is optional follow-up and must not block independently usable local capabilities.
+- Use the already available GitHub connection for sanitized technical work orders, code and PRs only. This public repository is not a mailbox for hotel operating records or credentials. Do not introduce a new polling service, public endpoint, or third-party account as a replacement prerequisite.
 - Keep the complete feature scope and approval boundaries. Operational data, credentials, and private on-site evidence stay outside this public repository.
 
 ## Cursor Cloud specific instructions

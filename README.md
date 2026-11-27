@@ -104,7 +104,9 @@ Each agent can also override its own `provider/model` runtime setting; agents wi
 
 ### 🏨 Hotel Command Center
 
-The target operating model is **ChatGPT for strategy and overall coordination, ClawX for management and execution, and Codex for technical development**. Direct Codex business pilots are temporary. The current priority is connecting and validating the system task flow; see the [architecture and integration work order](docs/hotel-operations/system-architecture.md).
+**Current rollout: use the local system first.** Keep the working DeepSeek setup and hotel task center, with one batch brief and one summary per handoff. Cloud tunnel onboarding is paused and is not a prerequisite for local use. See [local operation and batch handoff](docs/hotel-operations/local-first.md). Automated cloud handoff remains disabled; the complete feature scope is retained.
+
+The target operating model is **ChatGPT for strategy and overall coordination, ClawX for management and execution, and Codex for technical development**. Direct Codex business pilots are temporary. The current priority is using the existing local task center; see the [architecture and current operating mode](docs/hotel-operations/system-architecture.md).
 
 This branch adds **Hotel Command Center** (`/hotel`) for role bindings to existing agents, persistent tasks and dependencies, Gateway dispatch, structured result review, versioned business approvals, source-backed daily metrics, shared knowledge, schedules, and multiple properties. A separately scoped local MCP bridge supports compatible clients without giving them owner approval privileges.
 

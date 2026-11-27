@@ -105,7 +105,9 @@ ClawX 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 
 ### 🏨 酒店总管工作台
 
-目标分工为 **ChatGPT 负责谋略与全局统筹、ClawX 负责管理执行、Codex 负责技术建设**。直接 Codex 业务任务仅作临时试跑，当前优先接通并验证系统任务链，详见[系统分工与接通工单](docs/hotel-operations/system-architecture.md)。
+**当前采用本机先用：** 沿用已工作的 DeepSeek 和酒店总管，以批次任务单和汇总交接；云端隧道已暂停，不是本机使用的前提。操作见[本机先用与批次交接](docs/hotel-operations/local-first.md)。自动云端交接仍未启用，完整功能目标保留。
+
+目标分工为 **ChatGPT 负责谋略与全局统筹、ClawX 负责管理执行、Codex 负责技术建设**。直接 Codex 业务任务仅作临时试跑，当前优先使用已有本机工作台，详见[系统分工与当前工作方式](docs/hotel-operations/system-architecture.md)。
 
 本分支新增 **酒店总管**（`/hotel`），支持绑定现有 Agent、持久任务与依赖、Gateway 派单、结构化回传验收、版本化经营审批、有来源的经营日报、共享知识、定时计划及多门店。独立授权的本机 MCP 桥接供兼容客户端交接任务，不授予老板审批权限。
 
