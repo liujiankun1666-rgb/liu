@@ -1,6 +1,10 @@
-# 运营电脑本地 Codex 交接单
+# ClawX 现场联调参考（已暂停）
 
-目标：在实际运营电脑复用既有 ClawX Agent、模型和已授权资料，完成酒店总管的首个真实任务闭环。
+**2026-11-27 执行方向已调整：用户确认现有酒店岗位位于 Codex，并决定直接用 Codex 工作。当前按[直接 Codex 执行交接](codex-direct.md)继续，ClawX 安装和模型接入不再是前置条件。**
+
+本页保留旧 ClawX 联调路线，仅在用户将来重新选择该路线时参考；以下安装、Gateway 和 Agent 绑定步骤当前不执行。旧路线曾假设复用 ClawX Agent，该假设已被用户关于现有 Codex 岗位的确认取代。
+
+历史目标：在实际运营电脑复用 ClawX Agent、模型和已授权资料，完成酒店总管的首个真实任务闭环。
 本文件是普通交接说明，不会安装技能、迁移账号或自动修改本机配置。
 
 ## 已验证的代码基线
@@ -61,9 +65,10 @@ Windows NSIS 安装器会处理旧进程、替换程序、修改 PATH，并尝�
 卸载提供删除 AppData 的选项；保留环境时不要选择删除数据。仅构建工件不会访问运营电脑配置，安装和首次运行另有上述影响。
 配置依据：[`electron-builder.yml`](../../electron-builder.yml)、[`installer.nsh`](../../scripts/installer.nsh)、[Windows 手动工作流](../../.github/workflows/package-win-manual.yml)、[Release 工作流](../../.github/workflows/release.yml)。
 
-## 可直接复制给运营电脑本地 Codex 的任务
+## 历史 ClawX 联调任务（当前暂停，不执行）
 
 ```text
+历史参考：以下任务当前暂停，现行任务见 codex-direct.md。
 请在这台电脑完成酒店总管现场联调，复用现有 ClawX Agent、模型和后台登录，保留已有配置。
 先读取本地仓库 AGENTS.md 与 docs/hotel-operations/onsite-handoff.md，保护已有改动。
 已验证功能提交是 1f4e0f7c5b4221855af5df35a49f70ebd88e239d，仓库为 liujiankun1666-rgb/liu。
