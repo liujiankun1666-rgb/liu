@@ -4,6 +4,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Hotel } from '../../src/pages/Hotel';
 import { TaskDetail } from '../../src/pages/Hotel/TaskDetail';
+import { TaskEditor } from '../../src/pages/Hotel/TaskEditor';
+import { Field } from '../../src/pages/Hotel/components';
+import { Input } from '../../src/components/ui/input';
 import type { HotelSnapshotResponse, HotelTask } from '../../shared/hotel';
 
 const { fetchMock, successMock, errorMock, switchSessionMock } = vi.hoisted(() => ({ fetchMock: vi.fn(), successMock: vi.fn(), errorMock: vi.fn(), switchSessionMock: vi.fn() }));
@@ -92,6 +95,36 @@ describe('Hotel operations UI', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '确认方案并派给现有 Agent' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/hotel/tasks/video-task/delegate', expect.objectContaining({ method: 'POST' })));
+  });
+
+  it('labels task editor selects exactly and preserves their interactions', () => {
+    render(<TaskEditor propertyId="xingcheng-aigong" tasks={[]} knowledge={[]} templates={[]} busy={false} run={vi.fn()} onClose={vi.fn()} onCreated={vi.fn()} />);
+    const roleSelect = screen.getByLabelText('负责岗位', { exact: true });
+    const actionSelect = screen.getByLabelText('任务类型', { exact: true });
+    expect(screen.getByRole('combobox', { name: '负责岗位', exact: true })).toBe(roleSelect);
+    expect(screen.getByRole('combobox', { name: '任务类型', exact: true })).toBe(actionSelect);
+    expect(Array.from((roleSelect as HTMLSelectElement).labels ?? [], (label) => label.textContent?.trim())).toEqual(['负责岗位']);
+    expect(Array.from((actionSelect as HTMLSelectElement).labels ?? [], (label) => label.textContent?.trim())).toEqual(['任务类型']);
+    fireEvent.change(roleSelect, { target: { value: 'revenue' } });
+    fireEvent.change(actionSelect, { target: { value: 'price_change' } });
+    expect(roleSelect).toHaveValue('revenue');
+    expect(actionSelect).toHaveValue('price_change');
+    expect(screen.getByLabelText('影响对象', { exact: true })).toBeInTheDocument();
+  });
+
+  it('exposes task editor help text as a description instead of part of the label', () => {
+    render(<TaskEditor propertyId="xingcheng-aigong" tasks={[]} knowledge={[]} templates={[]} busy={false} run={vi.fn()} onClose={vi.fn()} onCreated={vi.fn()} />);
+    const criteria = screen.getByLabelText('验收条件', { exact: true });
+    expect(criteria).toHaveAccessibleName('验收条件');
+    expect(criteria).toHaveAccessibleDescription('每行一项；Agent 返回后逐项核对。');
+  });
+
+  it('preserves an existing control id and description when adding a field hint', () => {
+    render(<><p id="existing-help">已有说明。</p><Field label="门店标识" hint="使用小写字母。"><Input id="property-id" aria-describedby="existing-help" /></Field></>);
+    const input = screen.getByLabelText('门店标识', { exact: true });
+    expect(input).toHaveAttribute('id', 'property-id');
+    expect(input).toHaveAccessibleName('门店标识');
+    expect(input).toHaveAccessibleDescription('已有说明。 使用小写字母。');
   });
 
 });

@@ -7,14 +7,14 @@
 | 检查 | 命令或范围 | 结果 |
 | --- | --- | --- |
 | TypeScript 项目检查 | `corepack pnpm exec tsc --noEmit --pretty false` | 通过 |
-| 全量自动化测试 | `corepack pnpm test` | 75 个测试文件、515 项测试全部通过 |
+| 全量自动化测试 | `corepack pnpm test` | 75 个测试文件、518 项测试全部通过 |
 | 构建 | `corepack pnpm run build:vite` | Renderer、Electron Main 和 Preload 构建通过 |
 | ESLint | `corepack pnpm exec eslint .` | 0 错误；原有 `src/pages/Channels/index.tsx:137` 有 1 项未使用的禁用指令警告 |
 | 通信回放与基线比较 | `corepack pnpm run comms:replay` 和 `corepack pnpm run comms:compare` | 通过 |
 | 本机 MCP 适配器语法 | `node --check scripts/hotel-mcp-bridge.mjs` | 通过 |
 | 补丁格式 | `git diff --check` | 通过 |
 
-515 项测试包括新增酒店领域、Gateway 运行时、权限预检、内容上下文、MCP 桥接、HTTP 路由与 React 页面/辅助函数测试，并不是 515 项真实酒店后台验收。
+518 项测试包括新增酒店领域、Gateway 运行时、权限预检、内容上下文、MCP 桥接、HTTP 路由与 React 页面/辅助函数测试，并不是 518 项真实酒店后台验收。
 
 其中 `tests/unit/hotel-http.test.ts` 的 11 项测试启动临时回环 HTTP 服务，通过真实 `fetch` 调用实际路由、领域服务与桥接处理器。它们验证任务入队、审批版本失效、生产写入阻塞、令牌与来源校验、门店范围、请求大小和 JSON 格式；仅替换 Electron 路径依赖及实际 Gateway 执行端。这些属于接口集成测试，不是桌面端到端测试。
 
@@ -24,9 +24,11 @@
 
 测试运行有 EventEmitter 监听数量提示，构建有已有模块混合静态/动态导入的打包提示，均未导致检查失败。
 
-## 桌面与现场验证仍未完成
+## 桌面验证与现场接入边界
 
-已新增 `tests/e2e/hotel-operations.spec.ts`，覆盖工作台任务、知识、八岗位和审批版本行为。当前云端 Linux 环境没有可用图形显示环境：Electron headless 启动在窗口创建前崩溃，可用浏览器二进制与下载也受环境限制。因此本地没有通过 Electron E2E，也没有形成可用的界面截图验收记录。仓库现有 Electron E2E 工作流可在 GitHub Actions 的 Linux、macOS、Windows 环境执行；实际运行结果应以对应 PR 检查为准。
+已新增 `tests/e2e/hotel-operations.spec.ts`，覆盖工作台任务、知识、八岗位和审批版本行为。本地云端 Linux 环境没有可用图形显示环境：Electron headless 启动在窗口创建前崩溃，可用浏览器二进制与下载也受环境限制，因此本地没有通过 Electron E2E。
+
+公开分支建立后，GitHub Actions 已实际启动 Linux、macOS、Windows 三个平台的 Electron 测试。第一轮每个平台均为 12 项通过、1 项失败，定位到酒店任务表单的下拉框标签包含选项文字。修复将标签与控件显式关联，提示文字改用可访问描述，并补充 3 项回归测试；原有 E2E 断言保持不变。工作流会保存截图与 trace 工件，最新提交的最终结果应以 [PR 检查](https://github.com/liujiankun1666-rgb/liu/pull/1/checks)为准。
 
 以下内容还必须在实际运营电脑上验证：
 

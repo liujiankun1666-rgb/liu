@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { cloneElement, useId, type ReactElement, type ReactNode } from 'react';
 import { AlertCircle, Inbox } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -13,12 +13,20 @@ export function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variant}>{statusLabel(status)}</Badge>;
 }
 
-export function Field({ label, children, hint, className }: { label: string; children: ReactNode; hint?: string; className?: string }) {
-  return <label className={cn('block space-y-1.5 text-sm', className)}>
-    <span className="font-medium">{label}</span>
-    {children}
-    {hint && <span className="block text-xs leading-relaxed text-muted-foreground">{hint}</span>}
-  </label>;
+type FieldControlProps = { id?: string; 'aria-describedby'?: string };
+
+export function Field({ label, children, hint, className }: { label: string; children: ReactElement<FieldControlProps>; hint?: string; className?: string }) {
+  const generatedId = useId();
+  const controlId = children.props.id || `hotel-field-${generatedId}`;
+  const hintId = `${controlId}-hint`;
+  const describedBy = [children.props['aria-describedby'], hint ? hintId : undefined]
+    .filter(Boolean).join(' ') || undefined;
+
+  return <div className={cn('block space-y-1.5 text-sm', className)}>
+    <label htmlFor={controlId} className="block font-medium">{label}</label>
+    {cloneElement(children, { id: controlId, 'aria-describedby': describedBy })}
+    {hint && <p id={hintId} className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+  </div>;
 }
 
 export function Panel({ title, description, actions, children, className }: { title: string; description?: string; actions?: ReactNode; children: ReactNode; className?: string }) {
