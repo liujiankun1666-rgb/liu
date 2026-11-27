@@ -1,3 +1,4 @@
+import { getOpenClawConfigDir } from './paths';
 /**
  * OpenClaw workspace context utilities.
  *
@@ -51,7 +52,7 @@ export function mergeClawXSection(existing: string, section: string): string {
  * directories that already exist under ~/.openclaw/.
  */
 async function resolveAllWorkspaceDirs(): Promise<string[]> {
-  const openclawDir = join(homedir(), '.openclaw');
+  const openclawDir = getOpenClawConfigDir();
   const dirs = new Set<string>();
 
   const configPath = join(openclawDir, 'openclaw.json');

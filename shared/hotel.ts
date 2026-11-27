@@ -85,6 +85,8 @@ export interface HotelTask {
   deadline?: string; blockedReason?: string; createdAt: string; updatedAt: string;
   scheduleId?: string; scheduleSlot?: string; technicalTaskId?: string;
   reviewTarget?: { taskId: string; attemptId: string; resultHash: string; reviewerAgentId: string };
+  /** Explicit owner-requested, single-attempt replacement; the exhausted review is retained. */
+  reopenedReview?: { reviewTaskId: string; reason: string; requestedAt: string };
   delegation?: { attemptId: string; resultHash: string; childTaskIds: string[]; expandedAt: string; result: HotelTaskResult };
 }
 export interface CreateHotelTaskInput {

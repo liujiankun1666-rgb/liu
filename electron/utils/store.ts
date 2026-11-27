@@ -1,3 +1,4 @@
+import { getGatewayRuntimePort } from './config';
 /**
  * Persistent Storage
  * Electron-store wrapper for application settings
@@ -85,7 +86,7 @@ function createDefaultSettings(): AppSettings {
 
     // Gateway
     gatewayAutoStart: !isLocalOnboarding(),
-    gatewayPort: 18789,
+    gatewayPort: getGatewayRuntimePort(),
     gatewayToken: generateToken(),
     proxyEnabled: false,
     proxyServer: '',

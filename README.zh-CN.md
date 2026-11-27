@@ -121,6 +121,10 @@ ClawX 直接基于官方 **OpenClaw** 核心构建。无需单独安装，我们
 
 独立验收指令区分目标交付缺项与审查自身未完成：完成审查后可退回有缺项目标，无法核验必要证据时应报告审查阻塞。已有缺项继续阻止验收通过。详见[验收协议](docs/hotel-operations/protocol.md)；模型调用成功不代表独立验收已通过。
 
+显式独立联调模式可使用单独的OpenClaw state/config、任务库和端口，不接管原实例；见[本机隔离说明](docs/hotel-operations/local-onboarding.md)。这不代表操作系统凭据隔离。
+
+独立审查耗尽后，仅受认证的本机 owner Host API 可显式重开一次，沿用冻结目标和审查者且仅允许一次新执行；自动修复与 MCP 不会重开，旧失败全部保留。见[验收协议](docs/hotel-operations/protocol.md)。
+
 ### 📡 多频道管理
 同时配置和监控多个 AI 频道。每个频道独立运行，允许你为不同任务运行专门的智能体。
 现在每个频道支持多个账号，并可在 Channels 页面直接完成账号绑定到 Agent 与默认账号切换。

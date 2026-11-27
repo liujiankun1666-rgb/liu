@@ -220,6 +220,17 @@ describe('display-independent hotel HTTP integration', () => {
     expect(JSON.stringify(denied.body)).not.toContain('范围外测试店名称');
   });
 
+  it('routes explicit reopening with Host-derived authority and never body actor', async () => {
+    const reopen = vi.spyOn(service, 'reopenSupervisorReview').mockResolvedValue({ id: 'replacement' } as HotelTask);
+    const response = await request('/api/hotel/tasks/exhausted/reopen-review', { body: { propertyId: 'xingcheng-aigong', reason: 'Fixed review contract', actor: 'bridge' } });
+    expect(response.status).toBe(200);
+    expect(reopen).toHaveBeenCalledWith('exhausted', { actor: 'owner', propertyId: 'xingcheng-aigong', reason: 'Fixed review contract' });
+    const token = await bridgeToken(true);
+    const denied = await rpc(token, 'tools/call', { name: 'hotel_reopen_review', arguments: { taskId: 'exhausted', propertyId: 'xingcheng-aigong', reason: 'Spoof owner', actor: 'owner' } });
+    expect((denied.body.result as McpResult).isError).toBe(true);
+    expect(reopen).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['/api/hotel/tasks', '/hotel-bridge/mcp'])('returns JSON 400 for malformed input on %s', async (path) => {
     const token = path.includes('bridge') ? await bridgeToken() : undefined;
     const response = await request(path, { token, rawBody: '{broken-json' });

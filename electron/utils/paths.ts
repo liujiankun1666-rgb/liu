@@ -2,6 +2,7 @@
  * Path Utilities
  * Cross-platform path resolution helpers
  */
+import { openClawIsolation } from './openclaw-isolation';
 import { createRequire } from 'node:module';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -51,7 +52,7 @@ export function expandPath(path: string): string {
  * Get OpenClaw config directory
  */
 export function getOpenClawConfigDir(): string {
-  return join(homedir(), '.openclaw');
+  return openClawIsolation()?.stateDir ?? join(homedir(), '.openclaw');
 }
 
 /**
@@ -65,7 +66,7 @@ export function getOpenClawSkillsDir(): string {
  * Get ClawX config directory
  */
 export function getClawXConfigDir(): string {
-  return join(homedir(), '.clawx');
+  return openClawIsolation()?.userData ?? join(homedir(), '.clawx');
 }
 
 /**

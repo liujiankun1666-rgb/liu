@@ -1,3 +1,4 @@
+import { getGatewayRuntimePort } from '../utils/config';
 /**
  * Electron Main Process Entry
  * Manages window creation, system tray, and IPC handlers
@@ -318,7 +319,7 @@ async function initialize(): Promise<void> {
   // The URL filter ensures this callback only fires for gateway requests,
   // avoiding unnecessary overhead on every other HTTP response.
   session.defaultSession.webRequest.onHeadersReceived(
-    { urls: ['http://127.0.0.1:18789/*', 'http://localhost:18789/*'] },
+    { urls: [`http://127.0.0.1:${getGatewayRuntimePort()}/*`, `http://localhost:${getGatewayRuntimePort()}/*`] },
     (details, callback) => {
       const headers = { ...details.responseHeaders };
       delete headers['X-Frame-Options'];

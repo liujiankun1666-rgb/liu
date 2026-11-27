@@ -72,6 +72,7 @@ export function hotelPlanHash(task: Pick<HotelTask, 'propertyId' | 'action' | 'p
   return createHash('sha256').update(JSON.stringify(canonical({ propertyId: task.propertyId, action: task.action, planVersion: task.planVersion, plan: task.plan, objective: task.objective }))).digest('hex');
 }
 function hash(value: unknown): string { return createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex'); }
+export function hotelResultHash(result: HotelTaskResult): string { return hash(result); }
 function validatePlan(value?: HotelPlan): HotelPlan | undefined {
   if (value === undefined) return undefined;
   if (!value || typeof value !== 'object') throw new HotelDomainError('Invalid execution plan');
@@ -467,6 +468,42 @@ export class HotelService {
         idempotencyKey: `supervisor-review:${target.id}:${attempt.id}:${hash({ resultHash, agentId: binding.agentId })}`,
       }, 'system');
       task.reviewTarget = { taskId: target.id, attemptId: attempt.id, resultHash, reviewerAgentId: binding.agentId };
+      return task;
+    });
+  }
+  /** Explicit local owner action only. Automatic review repair never calls this method. */
+  reopenSupervisorReview(id: string, input: { actor: 'owner'; propertyId: string; reason: string }): Promise<HotelTask> {
+    return this.transaction((state) => {
+      requireOwner(input.actor);
+      const reason = required(input.reason, 'reopen reason', 4000);
+      const previous = this.task(state, id);
+      if (previous.propertyId !== input.propertyId) throw new HotelDomainError('Review belongs to another property', 403);
+      if (!previous.reviewTarget || previous.role !== 'supervisor' || previous.action !== 'analysis') throw new HotelDomainError('Only a supervisor assessment can be reopened', 409);
+      if (previous.reopenedReview) throw new HotelDomainError('A reopened review cannot be reopened again', 409);
+      if (previous.status !== 'failed' || previous.attempts.length < previous.maxAttempts
+        || previous.attempts.some((attempt) => attempt.outcome !== 'failed' || !attempt.endedAt)) {
+        throw new HotelDomainError('Only an exhausted review with confirmed failed attempts can be reopened', 409);
+      }
+      const existing = state.tasks.find((task) => task.reopenedReview?.reviewTaskId === id);
+      if (existing) {
+        if (existing.reopenedReview?.reason !== reason || existing.propertyId !== previous.propertyId
+          || hash(existing.reviewTarget) !== hash(previous.reviewTarget)) throw new HotelDomainError('Idempotency conflict for reopened review', 409);
+        return existing;
+      }
+      const idempotencyKey = `supervisor-review-reopen:${previous.id}`;
+      if (state.tasks.some((task) => task.propertyId === previous.propertyId && task.idempotencyKey === idempotencyKey)) {
+        throw new HotelDomainError('Reopened review idempotency key is already occupied without its immutable association', 409);
+      }
+      this.reviewTarget(state, previous, previous.reviewTarget.reviewerAgentId);
+      const task = this.newTask(state, {
+        propertyId: previous.propertyId, role: 'supervisor', action: 'analysis', priority: previous.priority,
+        title: `重开验收：${previous.title}`.slice(0, 300), objective: previous.objective,
+        inputs: previous.inputs, acceptanceCriteria: [...previous.acceptanceCriteria],
+        idempotencyKey, maxAttempts: 1,
+      }, 'owner');
+      task.reviewTarget = structuredClone(previous.reviewTarget);
+      task.reopenedReview = { reviewTaskId: previous.id, reason, requestedAt: this.stamp() };
+      this.audit(state, previous.propertyId, 'review.reopened', `Explicit owner Host request; previous=${id}; frozenResult=${previous.reviewTarget.resultHash}; reason=${reason}`, task.id, 'owner');
       return task;
     });
   }

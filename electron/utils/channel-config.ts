@@ -1,3 +1,4 @@
+import { getOpenClawConfigDir } from './paths';
 /**
  * Channel Configuration Utilities
  * Manages channel configuration in OpenClaw config files.
@@ -7,7 +8,6 @@
 import { access, mkdir, readFile, writeFile, readdir, stat, rm } from 'fs/promises';
 import { constants } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { getOpenClawResolvedDir } from './paths';
 import * as logger from './logger';
 import { proxyAwareFetch } from './proxy-fetch';
@@ -19,7 +19,7 @@ import {
     toOpenClawChannelType,
 } from './channel-alias';
 
-const OPENCLAW_DIR = join(homedir(), '.openclaw');
+const OPENCLAW_DIR = getOpenClawConfigDir();
 const CONFIG_FILE = join(OPENCLAW_DIR, 'openclaw.json');
 const WECOM_PLUGIN_ID = 'wecom';
 // Note: QQBot is a built-in channel since OpenClaw 3.31 — no plugin ID needed.
@@ -81,7 +81,7 @@ function normalizeCredentialValue(value: string): string {
 }
 
 async function resolveFeishuPluginId(): Promise<string> {
-    const extensionRoot = join(homedir(), '.openclaw', 'extensions');
+    const extensionRoot = join(getOpenClawConfigDir(), 'extensions');
     for (const dirName of FEISHU_PLUGIN_ID_CANDIDATES) {
         const manifestPath = join(extensionRoot, dirName, 'openclaw.plugin.json');
         try {
@@ -946,7 +946,7 @@ export async function deleteChannelConfig(channelType: string): Promise<void> {
 
         if (resolvedChannelType === 'whatsapp') {
             try {
-                const whatsappDir = join(homedir(), '.openclaw', 'credentials', 'whatsapp');
+                const whatsappDir = join(getOpenClawConfigDir(), 'credentials', 'whatsapp');
                 if (await fileExists(whatsappDir)) {
                     await rm(whatsappDir, { recursive: true, force: true });
                     console.log('Deleted WhatsApp credentials directory');
@@ -980,7 +980,7 @@ export async function listConfiguredChannelsFromConfig(config: OpenClawConfig): 
     }
 
     try {
-        const whatsappDir = join(homedir(), '.openclaw', 'credentials', 'whatsapp');
+        const whatsappDir = join(getOpenClawConfigDir(), 'credentials', 'whatsapp');
         if (await fileExists(whatsappDir)) {
             const entries = await readdir(whatsappDir);
             const hasSession = await (async () => {

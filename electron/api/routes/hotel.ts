@@ -82,6 +82,9 @@ export async function handleHotelRoutes(req: IncomingMessage, res: ServerRespons
           case 'retry': task = await service.retryTask(id, { acknowledgeUncertain: body.acknowledgeUncertain === true }); break;
           case 'cancel': task = await runtime.cancel(id); break;
           case 'review': task = await service.reviewTask(id, { decision: body.decision as 'accept' | 'return', note: body.note as string, actor: 'owner' }); break;
+          // This router is behind the local Host token gate, unlike property-scoped MCP.
+          // Never take actor/authority from the request body; no bridge tool exposes this action.
+          case 'reopen-review': task = await service.reopenSupervisorReview(id, { actor: 'owner', propertyId: body.propertyId as string, reason: body.reason as string }); break;
           case 'approve': task = await service.approveTask(id, { decision: body.decision as 'approve' | 'reject', planVersion: body.planVersion as number, planHash: body.planHash as string | undefined, note: body.note as string, actor: 'owner' }); break;
           case 'result': task = await runtime.returnResult(id, body.attemptId as string, body.result as HotelTaskResult, 'owner'); break;
           case 'delegate': {

@@ -1,3 +1,4 @@
+import { openClawIsolation } from './openclaw-isolation';
 /**
  * Application Configuration
  * Centralized configuration constants and helpers
@@ -85,3 +86,6 @@ export const GATEWAY_CONFIG = {
   /** Startup retry interval (ms) */
   STARTUP_RETRY_INTERVAL: 1000,
 };
+
+/** Only the explicit real-isolation mode changes the managed Gateway port. */
+export function getGatewayRuntimePort(): number { return openClawIsolation()?.gatewayPort ?? PORTS.OPENCLAW_GATEWAY; }

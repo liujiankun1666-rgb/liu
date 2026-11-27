@@ -1,3 +1,4 @@
+import { assertIsolatedOpenClawConfig, openClawIsolation } from './openclaw-isolation';
 import { isAbsolute } from 'node:path';
 
 /** Real local integration mode: no mock transport and no permission-policy bypass. */
@@ -12,7 +13,8 @@ export function localOnboardingUserData(env: NodeJS.ProcessEnv = process.env): s
   if (!directory || !isAbsolute(directory)) {
     throw new Error('Local onboarding requires an explicit absolute CLAWX_USER_DATA_DIR');
   }
-  return directory;
+  assertIsolatedOpenClawConfig(env);
+  return openClawIsolation(env)?.userData ?? directory;
 }
 
 export function assertUpdatesAllowed(): void {

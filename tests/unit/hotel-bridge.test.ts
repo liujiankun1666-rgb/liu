@@ -50,9 +50,10 @@ describe('property-scoped hotel MCP bridge', () => {
     expect(initialized.result.protocolVersion).toBe('2025-06-18');
     expect(await h.bridge.process({ jsonrpc: '2.0', method: 'notifications/initialized' }, h.runtime, h.grant)).toBeNull();
     for (const scope of [false, true]) {
-      expect(hotelBridgeTools(scope).map((tool) => tool.name).join(' ')).not.toMatch(/approve|accept|bind|config|publish/);
+      expect(hotelBridgeTools(scope).map((tool) => tool.name).join(' ')).not.toMatch(/approve|accept|bind|config|publish|reopen/);
     }
     expect((await h.call('hotel_approve_task', { actor: 'owner' })).result.isError).toBe(true);
+    expect((await h.call('hotel_reopen_review', { actor: 'owner', propertyId: 'xingcheng-aigong', taskId: 'exhausted', reason: 'pretend owner' })).result.isError).toBe(true);
     expect((await h.call('hotel_dispatch_task', { taskId: 'anything' })).result.isError).toBe(true);
     expect(h.runtime.dispatch).not.toHaveBeenCalled();
   });

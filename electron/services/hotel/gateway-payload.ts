@@ -1,6 +1,7 @@
 import type { HotelTask, HotelTaskResult, HotelSnapshot } from '../../../shared/hotel';
 import { HOTEL_ROLE_LABELS } from '../../../shared/hotel';
 import { buildHotelContentContext } from './content-context';
+import { hotelResultHash } from './domain';
 
 export interface HotelResultEnvelope {
   taskId: string;
@@ -76,6 +77,19 @@ export function buildHotelBrief(task: HotelTask, snapshot: HotelSnapshot): strin
   if (!attempt) throw new Error('任务尚未建立执行记录');
   const property = snapshot.properties.find((item) => item.id === task.propertyId);
   if (!property) throw new Error('门店不存在');
+  const frozenTarget = task.reviewTarget ? snapshot.tasks.find((item) => item.id === task.reviewTarget!.taskId) : undefined;
+  if (task.reviewTarget && (!frozenTarget?.result || frozenTarget.propertyId !== task.propertyId
+    || frozenTarget.attempts.at(-1)?.id !== task.reviewTarget.attemptId
+    || hotelResultHash(frozenTarget.result) !== task.reviewTarget.resultHash)) {
+    throw new Error('固定验收目标与当前结果不一致，禁止构造审查指令');
+  }
+  const reviewConstraint = frozenTarget?.result && task.reviewTarget ? {
+    targetTaskId: task.reviewTarget.taskId, targetAttemptId: task.reviewTarget.attemptId,
+    resultHash: task.reviewTarget.resultHash,
+    targetMissingItems: frozenTarget.result.missingItems,
+    targetMissingItemsCount: frozenTarget.result.missingItems.length,
+    allowedAssessmentDecisions: frozenTarget.result.missingItems.length ? ['return'] : ['accept', 'return'],
+  } : undefined;
   const knowledge = snapshot.knowledge
     .filter((item) => item.propertyId === task.propertyId && (task.knowledgeIds.includes(item.id) || ['property', 'rooms', 'policy', 'metrics'].includes(item.category)))
     .map((item) => ({ id: item.id, title: item.title, revision: item.revisions.at(-1) }));
@@ -131,6 +145,12 @@ export function buildHotelBrief(task: HotelTask, snapshot: HotelSnapshot): strin
     }, null, 2),
     '最后只输出一个JSON对象（可用json代码块），格式如下，填写真实结果，不要照抄示例描述：',
     JSON.stringify(resultExample, null, 2),
+    reviewConstraint ? [
+      '以下是服务端依据冻结目标结果生成的本次审查约束，优先于对目标缺项的重新解释：',
+      JSON.stringify(reviewConstraint, null, 2),
+      'targetMissingItems 是已提交并冻结的目标缺项，不是请你重新分类的候选列表。非空时，即使认为某项本可写为局限，也只能有据 return，说明原执行岗需核实后重新提交；不能在本次审查中把它忽略、改名或当作已消除。不存在某个旧文件不能证明过去没有读取它；没有运行日志权限时不得声称核验了工具历史。',
+      '此约束没有替你作出验收结论。请实际核对可读证据，逐条给出自己的依据和返修理由；若不能完成必要核查，仍返回 blocked。审查已完整时不要把目标缺项复制到审查自身 missingItems。',
+    ].join('\n') : '',
     '不能完成时输出 {taskId,attemptId,outcome:"blocked"或"failed",error:"具体原因"}，禁止伪报完成。',
   ].join('\n\n');
 }

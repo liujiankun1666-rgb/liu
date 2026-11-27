@@ -287,3 +287,11 @@ MCP 暴露的是另一组受限工具，详见[接入文档](integration.md)，�
 ## 原生技术执行身份
 
 HotelAttempt新增可选executor（gateway或codex-cli，旧记录省略时仍为Gateway）。原生sessionKey以codex-cli开头，runId关联真实CLI thread与当前attempt；resultOrigin增加codex-cli。native attempt只接受同执行器实际回执，不能由bridge/owner/Gateway覆盖。审批与独立验收权限不变，技术结果默认needs_review。桥接入队审计actor明确为bridge；旧历史事件不倒改。详细限制见[native-codex.md](native-codex.md)。
+
+### 显式重开已耗尽的独立审查
+
+`POST /api/hotel/tasks/:exhaustedReviewId/reopen-review` 只由本机 Host API 认证入口提供；body 必须包含同一 `propertyId` 与非空 `reason`，不能用 body.actor 获得权限。共享 MCP 没有这个工具。
+
+服务端要求原审查 `failed`、所有批次已确认失败且达到原上限；目标仍为同店 `needs_review`，固定 task/attempt/resultHash/reviewer 与当前绑定一致且不是自审。原审查、三次或其他原有批次、冻结 inputs/result 均不改；创建带 `reopenedReview` 关联的新 draft，`maxAttempts=1`，仍需正常入队、真实 Gateway 回传与原验收校验。按旧审查 ID 幂等，同键预占或不同理由冲突会拒绝。一个原审查只可重开一次，替代审查不可递归重开；自动 repair/create 使用原有键，绝不自动续接耗尽审查。
+
+这项管理请求不是老板接受业务结果。正式质量结论仍只来自独立 reviewer 的相关 Gateway 回传。末尾审查约束由服务端固定结果生成，列出目标缺项及允许的决定；不能把冻结缺项重新归类为局限而 accept。证据无法核实时仍返回 blocked；旧文件不存在不证明历史上未读取它。

@@ -120,6 +120,10 @@ Public on-site verification and remaining connection gaps: [TASK-011 verificatio
 
 Independent review instructions distinguish missing target deliverables from an incomplete review: a completed review can return a deficient target, while a reviewer unable to verify required evidence reports blocked. Existing gaps remain acceptance blockers. See the [review protocol](docs/hotel-operations/protocol.md); successful model calls do not establish successful independent acceptance.
 
+An explicit isolated local-onboarding mode can run a separate OpenClaw state/config, task library and ports without taking over the original instance; see [local integration isolation](docs/hotel-operations/local-onboarding.md). It does not provide OS credential isolation.
+
+Exhausted independent reviews can be explicitly reopened once through the authenticated local owner Host API, with one new attempt and the same frozen target/reviewer; automatic repair and MCP cannot reopen them. Previous failures remain intact. See the [review protocol](docs/hotel-operations/protocol.md).
+
 ### 📡 Multi-Channel Management
 Configure and monitor multiple AI channels simultaneously. Each channel operates independently, allowing you to run specialized agents for different tasks.
 Each channel now supports multiple accounts, per-account agent binding, and switching the channel default account directly from the Channels page.
